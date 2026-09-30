@@ -43,7 +43,8 @@ let currentSvg='';
 let renderTimer=0,renderFrame=0,settleTimer=0,lastRender=-Infinity;
 const renderInterval=50;
 const svgNS='http://www.w3.org/2000/svg';
-let previewSvg,previewMap,previewBackground,previewCopies,appearanceKey='',cellSource='';
+let previewSvg,previewMap,previewBackground,previewCopies,previewPattern,previewScale=1,appearanceKey='',cellSource='';
+let scalePending=false,sliderScaling=false;
 function dimensions(){
  const mode=$('ratio').value;
  if(mode==='tile')return [1000,4*H];
@@ -51,10 +52,10 @@ function dimensions(){
  return [1600,1600*height/width];
 }
 function grid(){const step=+$('spacing').value;if(!grids.has(step))grids.set(step,path(d3.geoGraticule().step([step,step]).precision(.5)()));return grids.get(step);}
-function layout(){
- const [vw,vh]=dimensions(),tile=$('ratio').value==='tile';
- const k=tile?1:vw/(W*+$('density').value)*+$('zoom').value;
- const tw=W*k,th=H*k,ox=tile?0:state.offsetX,oy=tile?0:state.offsetY;
+function layout(unit=false){
+ const [vw,vh]=unit?[W,4*H]:dimensions(),tile=$('ratio').value==='tile';
+ const k=unit||tile?1:vw/(W*+$('density').value)*+$('zoom').value;
+ const tw=W*k,th=H*k,ox=unit||tile?0:state.offsetX,oy=unit||tile?0:state.offsetY;
  const transforms=[];
  const j0=Math.floor((-oy-th/2)/(2*th))-1,j1=Math.ceil((vh-oy+th)/(2*th))+1;
  const i0=Math.floor((-ox-tw)/(tw))-2,i1=Math.ceil((vw-ox+tw)/tw)+2;
@@ -87,8 +88,11 @@ function createSvg(pixelWidth){
 function updatePreview(style,view){
  const preview=$('mapPreview');
  if(!previewSvg){
-  preview.innerHTML=`<svg xmlns="${svgNS}"><title>Markley Tessellated World Map</title><metadata>${metadata}</metadata><defs><clipPath id="cell"><rect x="${-W/2}" y="${-H/2}" width="${W}" height="${H}"/></clipPath><g id="map" clip-path="url(#cell)" stroke-linejoin="round" stroke-linecap="round"></g></defs><rect data-background="true" width="100%" height="100%"/><g data-copies="true"></g></svg>`;
-  previewSvg=preview.querySelector('svg');previewMap=previewSvg.querySelector('#map');previewBackground=previewSvg.querySelector('[data-background]');previewCopies=previewSvg.querySelector('[data-copies]');
+  preview.innerHTML=`<svg xmlns="${svgNS}"><title>Markley Tessellated World Map</title><metadata>${metadata}</metadata><defs><clipPath id="cell"><rect x="${-W/2}" y="${-H/2}" width="${W}" height="${H}"/></clipPath><g id="map" clip-path="url(#cell)" stroke-linejoin="round" stroke-linecap="round"></g><pattern id="tessellation" patternUnits="userSpaceOnUse" width="${W}" height="${4*H}"><g data-copies="true"></g></pattern></defs><rect data-background="true" width="100%" height="100%"/><rect width="100%" height="100%" fill="url(#tessellation)"/></svg>`;
+  previewSvg=preview.querySelector('svg');previewMap=previewSvg.querySelector('#map');previewBackground=previewSvg.querySelector('[data-background]');previewCopies=previewSvg.querySelector('[data-copies]');previewPattern=previewSvg.querySelector('#tessellation');
+  for(const transform of layout(true).transforms){
+   const node=document.createElementNS(svgNS,'use');node.setAttribute('href','#map');node.setAttribute('transform',transform);previewCopies.append(node);
+  }
  }
  if(previewMap.dataset.appearance!==style.key){
   previewMap.innerHTML=style.source;previewMap.dataset.appearance=style.key;
@@ -96,13 +100,17 @@ function updatePreview(style,view){
  }
  previewSvg.setAttribute('width',1600);previewSvg.setAttribute('height',1600*view.vh/view.vw);previewSvg.setAttribute('viewBox',`0 0 ${view.vw} ${view.vh}`);
  previewBackground.setAttribute('fill',style.sea);previewBackground.setAttribute('display',style.transparent?'none':'inline');
- while(previewCopies.children.length>view.transforms.length)previewCopies.lastElementChild.remove();
- view.transforms.forEach((transform,i)=>{
-  let node=previewCopies.children[i];
-  if(!node){node=document.createElementNS(svgNS,'use');node.setAttribute('href','#map');previewCopies.append(node);}
-  node.setAttribute('transform',transform);
- });
+ previewScale=view.k;movePreview();
 
+}
+
+function movePreview(){
+ if(!previewPattern)return;
+ const tile=$('ratio').value==='tile',tw=W*previewScale,periodY=4*H*previewScale;
+ const wrap=(value,period)=>((value%period)+period)%period;
+ const x=tile?0:wrap(state.offsetX,tw),y=tile?0:wrap(state.offsetY,periodY);
+ // Move the existing periodic layer; no geometry or tile layout is rebuilt.
+ previewPattern.setAttribute('patternTransform',`translate(${x} ${y}) scale(${previewScale})`);
 }
 
 function render(){
@@ -110,7 +118,7 @@ function render(){
  try{
   const style=appearance(),view=layout(),[aspectWidth,aspectHeight]=dimensions();
   updatePreview(style,view);
-  currentSvg='ready';
+  currentSvg='ready';scalePending=false;
   paper.style.maxWidth=`min(1400px, calc((100vh - 290px) * ${aspectWidth/aspectHeight}))`;
   paper.style.aspectRatio=`${aspectWidth} / ${aspectHeight}`;
   paper.dataset.state='ready';
@@ -148,10 +156,22 @@ function schedule(){
  const delay=Math.max(0,renderInterval-(performance.now()-lastRender));
  if(delay)renderTimer=setTimeout(queueFrame,delay);else queueFrame();
 }
+function requestScale(debounce=true){
+ scalePending=true;
+ clearTimeout(renderTimer);clearTimeout(settleTimer);renderTimer=settleTimer=0;
+ if(renderFrame){cancelAnimationFrame(renderFrame);renderFrame=0;}
+ $('zoomValue').textContent=(+$('zoom').value).toFixed(2)+'×';
+ if(debounce)settleTimer=setTimeout(finishRender,160);
+}
+$('zoom').addEventListener('pointerdown',()=>{sliderScaling=true;clearTimeout(settleTimer);});
+for(const event of ['pointerup','pointercancel','lostpointercapture'])$('zoom').addEventListener(event,()=>{
+ if(!sliderScaling)return;sliderScaling=false;finishRender();
+});
 function applyPalette(id){palettes[id].forEach((value,i)=>$( ['sea','land','line','grid'][i]).value=value);document.querySelectorAll('.palette').forEach(b=>b.classList.toggle('active',b.dataset.palette===id));schedule();}
 document.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{
  $('status').textContent='';
  syncResolution(el.id);
+ if(el.id==='zoom'){requestScale(!sliderScaling);return;}
  if(el.id==='ratio'){state.offsetX=state.offsetY=0;}
  if(['sea','land','line','grid'].includes(el.id))document.querySelectorAll('.palette').forEach(b=>b.classList.remove('active'));
  schedule();
@@ -164,7 +184,7 @@ function anchoredZoom(next,ax,ay,baseZoom=+$('zoom').value,baseX=state.offsetX,b
  $('zoom').value=Math.max(.2,Math.min(8,next));
  const factor=+$('zoom').value/baseZoom;
  state.offsetX=ax-(ax-baseX)*factor;state.offsetY=ay-(ay-baseY)*factor;
- schedule();
+ requestScale(drag?.button!==1);
 }
 $('mapPreview').addEventListener('wheel',e=>{
  e.preventDefault();if($('ratio').value==='tile')return;
@@ -176,6 +196,7 @@ $('mapPreview').addEventListener('auxclick',e=>{if(e.button===1)e.preventDefault
 $('mapPreview').addEventListener('pointerdown',e=>{
  if($('ratio').value==='tile'||(e.button!==0&&e.button!==1))return;
  e.preventDefault();
+ if(scalePending){clearTimeout(settleTimer);settleTimer=0;render();}
  const [w,h]=dimensions(),rect=e.currentTarget.getBoundingClientRect();
  drag={x:e.clientX,y:e.clientY,ox:state.offsetX,oy:state.offsetY,sx:w/rect.width,sy:h/rect.height,button:e.button,zoom:+$('zoom').value,ax:(e.clientX-rect.left)*w/rect.width,ay:(e.clientY-rect.top)*h/rect.height};
  e.currentTarget.setPointerCapture(e.pointerId);e.currentTarget.classList.add('dragging');
@@ -183,10 +204,11 @@ $('mapPreview').addEventListener('pointerdown',e=>{
 $('mapPreview').addEventListener('pointermove',e=>{
  if(!drag)return;
  if(drag.button===1){anchoredZoom(drag.zoom*Math.exp((drag.y-e.clientY)*.006),drag.ax,drag.ay,drag.zoom,drag.ox,drag.oy);return;}
- state.offsetX=drag.ox+(e.clientX-drag.x)*drag.sx;state.offsetY=drag.oy+(e.clientY-drag.y)*drag.sy;schedule();
+ state.offsetX=drag.ox+(e.clientX-drag.x)*drag.sx;state.offsetY=drag.oy+(e.clientY-drag.y)*drag.sy;movePreview();
 });
 for(const event of ['pointerup','pointercancel','lostpointercapture'])$('mapPreview').addEventListener(event,()=>{
- if(!drag)return;drag=null;$('mapPreview').classList.remove('dragging');finishRender();
+ if(!drag)return;const scaling=drag.button===1;drag=null;$('mapPreview').classList.remove('dragging');
+ if(scaling)finishRender();
 });
 function download(blob,name){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
 function filename(ext){const [w,h]=pixels();return `markley-${$('ratio').value}-${w}x${h}.${ext}`;}

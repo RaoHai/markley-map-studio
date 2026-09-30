@@ -13,7 +13,7 @@ A static, offline world-map poster generator with an infinitely repeating Markle
 - Configurable graticule spacing, thickness, and opacity.
 - Custom output width and height, aspect lock, and resolution presets.
 - Left-drag pan, wheel zoom, and middle-button vertical drag to adjust scale.
-- Full vector preview with persistent nodes, throttled to 20 updates per second during gestures and redrawn when input ends. PNG/SVG export uses the same vector geography.
+- Full vector preview with a periodic map layer: pan moves the existing layer without rebuilding it; zoom redraws only when the gesture ends. PNG/SVG export uses the same vector geography.
 - Infinite tiling and a rectangular repeat-unit export mode.
 - PNG and SVG export, including transparent oceans. PNG exports above 40 million pixels are blocked to avoid excessive memory use.
 - A single self-contained HTML file: works offline without requests to external servers.
@@ -34,7 +34,7 @@ npx playwright install chromium
 npm test
 ```
 
-To use an existing Chrome installation, set `CHROME_PATH` to its executable. Tests cover PNG dimensions, SVG export, pan/reset, wheel and middle-button zoom, infinite tiling, palettes, graticules, transparency, offline requests, mobile overflow, and throttled interactions and final redraw after zoom/pan.
+To use an existing Chrome installation, set `CHROME_PATH` to its executable. Tests cover PNG dimensions, SVG export, pan/reset, wheel and middle-button zoom, infinite tiling, palettes, graticules, transparency, offline requests, mobile overflow, and pan without rebuilding geometry and redraw only after zoom ends.
 
 ## Cloudflare Pages
 
