@@ -1,5 +1,7 @@
 # Markley Map Studio
 
+**Live:** https://markley-map-studio.pages.dev/
+
 A static, offline world-map poster generator with an infinitely repeating Markley tetrahedral conformal layout. Built from real Natural Earth geography, with no AI-generated map geometry.
 
 ![Preview](docs/preview.png)
@@ -34,6 +36,8 @@ npm test
 To use an existing Chrome installation, set `CHROME_PATH` to its executable. Tests cover PNG dimensions, SVG export, pan/reset, wheel and middle-button zoom, infinite tiling, palettes, graticules, transparency, offline requests, and mobile overflow.
 
 ## Cloudflare Pages
+
+The live site uses dashboard Direct Upload. Source pushes do not automatically deploy to Cloudflare.
 
 For dashboard Direct Upload, upload the contents of `dist/` (or a ZIP containing those files at its root). For Git integration, use production branch `main`, build command `npm run build`, output directory `dist`, and Node.js 22.
 
