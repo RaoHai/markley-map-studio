@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node tests/smoke.mjs",
+    "test": "node tests/smoke.mjs && node tests/preview.mjs",
     "start": "npx http-server dist -c-1"
   },
   "dependencies": {

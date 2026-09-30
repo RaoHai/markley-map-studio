@@ -34,7 +34,7 @@ function syncResolution(id){
  }else if(id==='lockAspect'&&$('lockAspect').checked)state.aspect=pixels()[0]/pixels()[1];
  $('outputHeight').readOnly=$('ratio').value==='tile';
 }
-let pending=false,currentSvg='',lastUrl;
+let pending=false,currentSvg='';
 function dimensions(){
  const mode=$('ratio').value;
  if(mode==='tile')return [1000,4*H];
@@ -62,20 +62,35 @@ function createSvg(pixelWidth){
  return `<svg xmlns="http://www.w3.org/2000/svg" width="${pixelWidth}" height="${ph}" viewBox="0 0 ${vw} ${vh}"><title>Markley Tessellated World Map</title><metadata>Natural Earth 4.1.0 / world-atlas 2.0.2, 1:50m; Lee conformal tetrahedral projection with Markley rectangular arrangement. Geographic coordinates, deduplicated national boundary mesh.</metadata><defs><clipPath id="cell"><rect x="${-W/2}" y="${-H/2}" width="${W}" height="${H}"/></clipPath><g id="map" clip-path="url(#cell)" stroke-linejoin="round" stroke-linecap="round"><path d="${land}" fill="${landColor}" stroke="${landColor}" stroke-width=".3"/>${$('showGrid').checked?`<path d="${grid()}" fill="none" stroke="${gridColor}" stroke-width="${gwidth}" opacity="${$('gridOpacity').value}"/>`:''}<path d="${edges}" fill="none" stroke="${lineColor}" stroke-width="${line}"/></g></defs>${transparent?'':`<rect width="100%" height="100%" fill="${sea}"/>`}${uses}</svg>`;
 }
 function render(){
- pending=false;currentSvg=createSvg(1600);
- const [aspectWidth,aspectHeight]=dimensions();
- $('mapPreview').parentElement.style.maxWidth=`min(1400px, calc((100vh - 290px) * ${aspectWidth/aspectHeight}))`;
- const url=URL.createObjectURL(new Blob([currentSvg],{type:'image/svg+xml'}));
- $('mapPreview').src=url;if(lastUrl)URL.revokeObjectURL(lastUrl);lastUrl=url;
- const [outW,outH]=pixels();
- $('sizeLabel').textContent=`${outW.toLocaleString()} × ${outH.toLocaleString()} px`;
- $('modeLabel').textContent=$('ratio').value==='tile'?'矩形重复单元 · 上下左右可平铺':'左键平移 · 滚轮缩放 · 中键拖动调整 scale';
- $('zoomValue').textContent=(+$('zoom').value).toFixed(2)+'×';
- $('lineValue').textContent=(+$('lineWidth').value).toFixed(2);
- $('gridValue').textContent=(+$('gridWidth').value).toFixed(2);
- $('gridOpacityValue').textContent=Math.round(+$('gridOpacity').value*100)+'%';
- for(const id of ['density','zoom'])$(id).disabled=$('ratio').value==='tile';
+ pending=false;
+ const preview=$('mapPreview'),paper=preview.parentElement,message=$('previewMessage');
+ try{
+  const nextSvg=createSvg(1600),[aspectWidth,aspectHeight]=dimensions();
+  // Render SVG directly: preview updates no longer depend on a temporary
+  // image URL surviving asynchronous decoding during pan/zoom gestures.
+  preview.innerHTML=nextSvg;
+  currentSvg=nextSvg;
+  paper.style.maxWidth=`min(1400px, calc((100vh - 290px) * ${aspectWidth/aspectHeight}))`;
+  paper.style.aspectRatio=`${aspectWidth} / ${aspectHeight}`;
+  paper.dataset.state='ready';
+  message.hidden=true;
+  const [outW,outH]=pixels();
+  $('sizeLabel').textContent=`${outW.toLocaleString()} × ${outH.toLocaleString()} px`;
+  $('modeLabel').textContent=$('ratio').value==='tile'?'矩形重复单元 · 上下左右可平铺':'左键平移 · 滚轮缩放 · 中键拖动调整 scale';
+  $('zoomValue').textContent=(+$('zoom').value).toFixed(2)+'×';
+  $('lineValue').textContent=(+$('lineWidth').value).toFixed(2);
+  $('gridValue').textContent=(+$('gridWidth').value).toFixed(2);
+  $('gridOpacityValue').textContent=Math.round(+$('gridOpacity').value*100)+'%';
+  for(const id of ['density','zoom'])$(id).disabled=$('ratio').value==='tile';
+ }catch(error){
+  // Keep the last successful map in place, and expose a useful retry state.
+  paper.dataset.state='error';
+  $('previewText').textContent=currentSvg?'地图更新失败，已保留上一张预览。':'地图预览暂时无法生成。';
+  $('retryPreview').hidden=false;
+  message.hidden=false;
+ }
 }
+$('retryPreview').onclick=schedule;
 function schedule(){if(!pending){pending=true;requestAnimationFrame(render);}}
 function applyPalette(id){palettes[id].forEach((value,i)=>$( ['sea','land','line','grid'][i]).value=value);document.querySelectorAll('.palette').forEach(b=>b.classList.toggle('active',b.dataset.palette===id));schedule();}
 document.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{
