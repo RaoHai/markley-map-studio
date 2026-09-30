@@ -39,10 +39,11 @@ function syncResolution(id){
  }else if(id==='lockAspect'&&$('lockAspect').checked)state.aspect=pixels()[0]/pixels()[1];
  $('outputHeight').readOnly=$('ratio').value==='tile';
 }
-let pending=false,currentSvg='';
+let currentSvg='';
+let renderTimer=0,renderFrame=0,settleTimer=0,lastRender=-Infinity;
+const renderInterval=50;
 const svgNS='http://www.w3.org/2000/svg';
 let previewSvg,previewMap,previewBackground,previewCopies,appearanceKey='',cellSource='';
-let textureKey='',textureTimer,textureGeneration=0;
 function dimensions(){
  const mode=$('ratio').value;
  if(mode==='tile')return [1000,4*H];
@@ -83,35 +84,6 @@ function createSvg(pixelWidth){
  const ph=Math.round(pixelWidth*vh/vw);
  return `<svg xmlns="${svgNS}" width="${pixelWidth}" height="${ph}" viewBox="0 0 ${vw} ${vh}"><title>Markley Tessellated World Map</title><metadata>${metadata}</metadata><defs><clipPath id="cell"><rect x="${-W/2}" y="${-H/2}" width="${W}" height="${H}"/></clipPath><g id="map" clip-path="url(#cell)" stroke-linejoin="round" stroke-linecap="round">${source}</g></defs>${transparent?'':`<rect width="100%" height="100%" fill="${sea}"/>`}${transforms.map(t=>`<use href="#map" transform="${t}"/>`).join('')}</svg>`;
 }
-function requestTexture(style,pixelWidth){
- const key=style.key+':'+pixelWidth;
- if(textureKey===key)return;
- textureKey=key;clearTimeout(textureTimer);
- const generation=++textureGeneration;
- // Decode a self-contained data URI once, never a temporary preview Blob URL.
- // While preparing a texture, the previous raster or vector cell stays visible.
- textureTimer=setTimeout(async()=>{
-  try{
-   const image=new Image(),height=Math.ceil(pixelWidth*H/W);
-   image.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(`<svg xmlns="${svgNS}" width="${pixelWidth}" height="${height}" viewBox="${-W/2} ${-H/2} ${W} ${H}"><g stroke-linejoin="round" stroke-linecap="round">${style.source}</g></svg>`);
-   await image.decode();
-   if(generation!==textureGeneration)return;
-   const canvas=document.createElement('canvas');canvas.width=pixelWidth;canvas.height=height;
-   const context=canvas.getContext('2d');if(!context)throw Error('No preview canvas');
-   context.drawImage(image,0,0,pixelWidth,height);
-   const raster=document.createElementNS(svgNS,'image');
-   for(const [name,value] of Object.entries({x:-W/2,y:-H/2,width:W,height:H,preserveAspectRatio:'none',href:canvas.toDataURL('image/png')}))raster.setAttribute(name,value);
-   if(generation!==textureGeneration)return;
-   previewMap.replaceChildren(raster);previewSvg.dataset.renderer='cached';
-   canvas.width=canvas.height=1;
-  }catch(error){
-   // Vector preview remains usable if raster decoding is unavailable.
-   if(generation===textureGeneration){
-    textureKey='';previewMap.innerHTML=style.source;previewSvg.dataset.renderer='vector';
-   }
-  }
- },120);
-}
 function updatePreview(style,view){
  const preview=$('mapPreview');
  if(!previewSvg){
@@ -119,8 +91,8 @@ function updatePreview(style,view){
   previewSvg=preview.querySelector('svg');previewMap=previewSvg.querySelector('#map');previewBackground=previewSvg.querySelector('[data-background]');previewCopies=previewSvg.querySelector('[data-copies]');
  }
  if(previewMap.dataset.appearance!==style.key){
-  if(!previewMap.firstElementChild)previewMap.innerHTML=style.source;
-  previewMap.dataset.appearance=style.key;previewSvg.dataset.renderer='preparing';
+  previewMap.innerHTML=style.source;previewMap.dataset.appearance=style.key;
+  previewSvg.dataset.renderer='vector';
  }
  previewSvg.setAttribute('width',1600);previewSvg.setAttribute('height',1600*view.vh/view.vw);previewSvg.setAttribute('viewBox',`0 0 ${view.vw} ${view.vh}`);
  previewBackground.setAttribute('fill',style.sea);previewBackground.setAttribute('display',style.transparent?'none':'inline');
@@ -130,13 +102,10 @@ function updatePreview(style,view){
   if(!node){node=document.createElementNS(svgNS,'use');node.setAttribute('href','#map');previewCopies.append(node);}
   node.setAttribute('transform',transform);
  });
- const displayedWidth=preview.getBoundingClientRect().width*view.k*W/view.vw*(window.devicePixelRatio||1);
- const quality=displayedWidth>2048?4096:displayedWidth>1024?2048:1024;
- requestTexture(style,quality);
+
 }
 
 function render(){
- pending=false;
  const preview=$('mapPreview'),paper=preview.parentElement,message=$('previewMessage');
  try{
   const style=appearance(),view=layout(),[aspectWidth,aspectHeight]=dimensions();
@@ -156,7 +125,6 @@ function render(){
   for(const id of ['density','zoom'])$(id).disabled=$('ratio').value==='tile';
  }catch(error){
   // Keep the last successful map in place, and expose a useful retry state.
-  clearTimeout(textureTimer);textureGeneration++;textureKey='';
   paper.dataset.state='error';
   $('previewText').textContent=currentSvg?'地图更新失败，已保留上一张预览。':'地图预览暂时无法生成。';
   $('retryPreview').hidden=false;
@@ -164,7 +132,22 @@ function render(){
  }
 }
 $('retryPreview').onclick=schedule;
-function schedule(){if(!pending){pending=true;requestAnimationFrame(render);}}
+function queueFrame(){
+ renderTimer=0;
+ renderFrame=requestAnimationFrame(()=>{renderFrame=0;render();lastRender=performance.now();});
+}
+function finishRender(){
+ clearTimeout(renderTimer);clearTimeout(settleTimer);renderTimer=settleTimer=0;
+ if(renderFrame)cancelAnimationFrame(renderFrame);
+ queueFrame();
+}
+function schedule(){
+ // Limit continuous input to 20 updates/sec, then always paint the final state.
+ clearTimeout(settleTimer);settleTimer=setTimeout(finishRender,160);
+ if(renderTimer||renderFrame)return;
+ const delay=Math.max(0,renderInterval-(performance.now()-lastRender));
+ if(delay)renderTimer=setTimeout(queueFrame,delay);else queueFrame();
+}
 function applyPalette(id){palettes[id].forEach((value,i)=>$( ['sea','land','line','grid'][i]).value=value);document.querySelectorAll('.palette').forEach(b=>b.classList.toggle('active',b.dataset.palette===id));schedule();}
 document.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{
  $('status').textContent='';
@@ -173,6 +156,7 @@ document.querySelectorAll('input,select').forEach(el=>el.addEventListener('input
  if(['sea','land','line','grid'].includes(el.id))document.querySelectorAll('.palette').forEach(b=>b.classList.remove('active'));
  schedule();
 }));
+document.querySelectorAll('input,select').forEach(el=>el.addEventListener('change',finishRender));
 document.querySelectorAll('.palette').forEach(b=>b.addEventListener('click',()=>applyPalette(b.dataset.palette)));
 $('resetView').onclick=()=>{state.offsetX=state.offsetY=0;$('zoom').value=1;schedule();};
 let drag;
@@ -201,7 +185,9 @@ $('mapPreview').addEventListener('pointermove',e=>{
  if(drag.button===1){anchoredZoom(drag.zoom*Math.exp((drag.y-e.clientY)*.006),drag.ax,drag.ay,drag.zoom,drag.ox,drag.oy);return;}
  state.offsetX=drag.ox+(e.clientX-drag.x)*drag.sx;state.offsetY=drag.oy+(e.clientY-drag.y)*drag.sy;schedule();
 });
-for(const event of ['pointerup','pointercancel'])$('mapPreview').addEventListener(event,()=>{drag=null;$('mapPreview').classList.remove('dragging');});
+for(const event of ['pointerup','pointercancel','lostpointercapture'])$('mapPreview').addEventListener(event,()=>{
+ if(!drag)return;drag=null;$('mapPreview').classList.remove('dragging');finishRender();
+});
 function download(blob,name){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
 function filename(ext){const [w,h]=pixels();return `markley-${$('ratio').value}-${w}x${h}.${ext}`;}
 $('exportSvg').onclick=()=>{try{const [width]=pixels(true);download(new Blob([createSvg(width)],{type:'image/svg+xml'}),filename('svg'));}catch(error){$('status').textContent=error.message;}};
