@@ -1,0 +1,47 @@
+import {build} from 'esbuild';
+import {chromium} from '@playwright/test';
+import {pathToFileURL} from 'node:url';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import sharp from 'sharp';
+await build({entryPoints:['src/cartography.js'],bundle:true,platform:'node',format:'esm',loader:{'.geojson':'json'},outfile:'.work/cartography-test.mjs'});
+const {countryColors,adjacency,scaleLength,provincePath}=await import('../.work/cartography-test.mjs');
+assert.ok(Math.max(...countryColors)<6);
+adjacency.forEach((ns,i)=>ns.forEach(j=>assert.notEqual(countryColors[i],countryColors[j])));
+assert.ok(scaleLength>10&&scaleLength<100);
+assert.ok(provincePath.length>10000&&!/NaN|Infinity/.test(provincePath));
+const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{})});
+try{
+ const page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);
+ await page.waitForFunction(()=>document.querySelector('.paper').dataset.state==='ready');
+ await page.locator('#atlasStyle').click();
+ await page.waitForFunction(()=>document.querySelector('#mapPreview canvas').dataset.appearance.includes('pastel'));
+ const svg=await page.evaluate(()=>mapStudio.createSvg(2000));
+ for(const layer of ['country-colors','bathymetry','china-provinces','local-scale','ocean-labels'])assert.ok(svg.includes(`data-layer="${layer}"`),layer);
+ assert.ok(svg.includes('120°W, 20°S'));assert.ok(!/NaN|Infinity/.test(svg));
+ fs.writeFileSync('.work/cartography-export.svg',svg);
+ await page.screenshot({path:process.cwd()+'/../markley-map-studio-atlas-preview.png',fullPage:true});
+ const version=await page.locator('#mapPreview canvas').getAttribute('data-texture-version');
+ const bounds=await page.locator('#mapPreview').boundingBox();
+ await page.mouse.move(bounds.x+bounds.width/2,bounds.y+bounds.height/2);await page.mouse.down();
+ await page.mouse.move(bounds.x+bounds.width/2+80,bounds.y+bounds.height/2+20,{steps:20});await page.mouse.up();
+ assert.equal(await page.locator('#mapPreview canvas').getAttribute('data-texture-version'),version);
+ await page.locator('#resolution').selectOption('2000');
+ await page.locator('#exportPng').click();
+ const downloaded=page.waitForEvent('download');await page.locator('#confirmDownload').click();
+ await (await downloaded).saveAs('.work/cartography-export.png');
+ const info=await sharp('.work/cartography-export.png').metadata();assert.equal(info.width,2000);assert.equal(info.height,866);
+ // Transparency omits all ocean fills, and individual toggles remove their layers.
+ await page.locator('#transparent').check();
+ assert.ok(!(await page.evaluate(()=>mapStudio.createSvg(2000))).includes('data-layer="bathymetry"'));
+ for(const id of ['showProvinces','showScale','showOceanLabels'])await page.locator('#'+id).uncheck();
+ const off=await page.evaluate(()=>mapStudio.createSvg(2000));
+ for(const layer of ['china-provinces','local-scale','ocean-labels'])assert.ok(!off.includes(`data-layer="${layer}"`));
+ await page.locator('#countryFill').selectOption('vintage');assert.ok((await page.evaluate(()=>mapStudio.createSvg(2000))).includes('#e7d4ae'));
+ await page.setViewportSize({width:375,height:812});
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ assert.deepEqual(errors,[]);
+ console.log('Cartography checks passed: adjacent countries differ, finite geography, local scale, atlas layers in SVG, transparency and toggles, vintage palette, mobile layout.');
+}finally{await browser.close();}

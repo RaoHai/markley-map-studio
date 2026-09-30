@@ -2,6 +2,7 @@ Third-party licenses
 ====================
 
 Natural Earth 1:10m China POV countries (5.1.1), minor islands (5.1.1), and China maritime indicators (5.1.0) are public domain.
+Natural Earth internal admin-1 boundary lines (5.1.0) and 200m/1000m bathymetry (4.0.0) are also public domain. Bathymetry is derived from SRTM Plus and generalized for display.
 Official island coordinate facts are attributed in data/README.md.
 https://www.naturalearthdata.com/about/terms-of-use/
 

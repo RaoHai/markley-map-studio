@@ -3,6 +3,7 @@ import {mesh,feature} from 'topojson-client';
 import world from '../data/world-cn.topo.json';
 import maritime from '../data/china-maritime.geojson';
 import islandMarkers from '../data/china-island-markers.geojson';
+import {countryFill,provincePath,oceanFill,oceanLabels,scaleBar} from './cartography.js';
 const $=id=>document.getElementById(id);
 const path=d3.geoPath(p).digits(3), land=path(feature(world,world.objects.land));
 const edges=path(mesh(world,world.objects.countries));
@@ -75,9 +76,10 @@ function appearance(){
  const line=+$('lineWidth').value,gwidth=+$('gridWidth').value;
  const [sea,landColor,lineColor,gridColor]=['sea','land','line','grid'].map(id=>$(id).value);
  const showGrid=$('showGrid').checked,opacity=$('gridOpacity').value,step=$('spacing').value;
- const key=JSON.stringify([landColor,lineColor,gridColor,line,gwidth,showGrid,opacity,step]);
+ const fillStyle=$('countryFill').value,showOcean=$('showOcean').checked&&!$('transparent').checked,showProvinces=$('showProvinces').checked,showScale=$('showScale').checked,showOceanLabels=$('showOceanLabels').checked;
+ const key=JSON.stringify([landColor,lineColor,gridColor,line,gwidth,showGrid,opacity,step,fillStyle,showOcean,showProvinces,showScale,showOceanLabels,sea]);
  if(key!==appearanceKey){
-  cellSource=`<path d="${land}" fill="${landColor}" stroke="${landColor}" stroke-width=".3"/>${showGrid?`<path d="${grid()}" fill="none" stroke="${gridColor}" stroke-width="${gwidth}" opacity="${opacity}"/>`:''}<path d="${edges}" fill="none" stroke="${lineColor}" stroke-width="${line}"/><path data-layer="china-maritime" d="${maritimePath}" fill="none" stroke="${lineColor}" stroke-width="${line}"/><path data-layer="china-islands" d="${islandPath}" fill="${landColor}" stroke="${lineColor}" stroke-width="${Math.max(.25,line*.65)}"/><path data-layer="china-shoals" d="${shoalPath}" fill="none" stroke="${lineColor}" stroke-width="${Math.max(.25,line*.65)}"/>`;
+  cellSource=`${showOcean?oceanFill(sea):''}<path d="${land}" fill="${landColor}" stroke="${landColor}" stroke-width=".3"/>${countryFill(fillStyle)}${showGrid?`<path d="${grid()}" fill="none" stroke="${gridColor}" stroke-width="${gwidth}" opacity="${opacity}"/>`:''}${showProvinces?`<path data-layer="china-provinces" d="${provincePath}" fill="none" stroke="${lineColor}" stroke-width="${line*.55}" opacity=".75"/>`:''}<path d="${edges}" fill="none" stroke="${lineColor}" stroke-width="${line}"/><path data-layer="china-maritime" d="${maritimePath}" fill="none" stroke="${lineColor}" stroke-width="${line}"/><path data-layer="china-islands" d="${islandPath}" fill="${landColor}" stroke="${lineColor}" stroke-width="${Math.max(.25,line*.65)}"/><path data-layer="china-shoals" d="${shoalPath}" fill="none" stroke="${lineColor}" stroke-width="${Math.max(.25,line*.65)}"/>${showOceanLabels?oceanLabels(gridColor):''}${showScale?scaleBar(gridColor):''}`;
   appearanceKey=key;
  }
  return {key,sea,transparent:$('transparent').checked,source:cellSource};
@@ -216,6 +218,11 @@ for(const event of ['pointerup','pointercancel','lostpointercapture'])$('zoom').
  if(!sliderScaling)return;sliderScaling=false;finishRender();
 });
 function applyPalette(id){palettes[id].forEach((value,i)=>$( ['sea','land','line','grid'][i]).value=value);document.querySelectorAll('.palette').forEach(b=>b.classList.toggle('active',b.dataset.palette===id));schedule();}
+$('atlasStyle').onclick=()=>{
+ ['#b6dce3','#faf3d1','#5c8390','#6f9da6'].forEach((value,i)=>$( ['sea','land','line','grid'][i]).value=value);
+ $('countryFill').value='pastel';for(const id of ['showOcean','showOceanLabels','showProvinces','showScale','showGrid'])$(id).checked=true;
+ document.querySelectorAll('.palette').forEach(b=>b.classList.remove('active'));finishRender();
+};
 document.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{
  $('status').textContent='';
  syncResolution(el.id);
@@ -224,6 +231,11 @@ document.querySelectorAll('input,select').forEach(el=>el.addEventListener('input
  if(['sea','land','line','grid'].includes(el.id))document.querySelectorAll('.palette').forEach(b=>b.classList.remove('active'));
  schedule();
 }));
+$('atlasStyle').onclick=()=>{
+ ['#b6dce3','#faf3d1','#5c8390','#6f9da6'].forEach((value,i)=>$( ['sea','land','line','grid'][i]).value=value);
+ $('countryFill').value='pastel';for(const id of ['showOcean','showOceanLabels','showProvinces','showScale','showGrid'])$(id).checked=true;
+ document.querySelectorAll('.palette').forEach(b=>b.classList.remove('active'));finishRender();
+};
 document.querySelectorAll('input,select').forEach(el=>el.addEventListener('change',finishRender));
 document.querySelectorAll('.palette').forEach(b=>b.addEventListener('click',()=>applyPalette(b.dataset.palette)));
 $('resetView').onclick=()=>{state.offsetX=state.offsetY=0;$('zoom').value=1;schedule();};

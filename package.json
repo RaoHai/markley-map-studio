@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node tests/geography.mjs && node tests/smoke.mjs && node tests/preview.mjs && node tests/performance.mjs && node tests/retina.mjs && node tests/disclaimer.mjs",
+    "test": "node tests/geography.mjs && node tests/smoke.mjs && node tests/preview.mjs && node tests/performance.mjs && node tests/retina.mjs && node tests/disclaimer.mjs && node tests/cartography.mjs",
     "start": "npx http-server dist -c-1",
     "geography": "node scripts/build-geography.mjs"
   },

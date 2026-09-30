@@ -24,6 +24,7 @@ aside{min-width:0}.palettes,.color-grid{min-width:0}.palette{min-width:0}
 #previewMessage[hidden],#retryPreview[hidden]{display:none}
 .paper[data-state=error] #previewMessage{inset:auto 12px 12px;flex-direction:row;border:1px solid #d3dbce;border-radius:6px;padding:12px}
 #retryPreview{border:1px solid #ced7c9;background:#fff;color:#50654f;border-radius:5px;padding:6px 10px;font-size:11px}
+#atlasStyle{width:100%;margin:12px 0 0;border:1px solid #ced7c9;border-radius:6px;padding:10px;font-size:12px}
 .disclaimer-link{background:none;border:0;padding:0;color:#536c60;text-decoration:underline;cursor:pointer;font:inherit;margin-top:6px}
 .data-notice{font-size:11px;line-height:1.7;color:#687762;margin:14px 0 0}
 #downloadDisclaimer{width:min(480px,calc(100% - 32px));max-height:calc(100dvh - 48px);overflow:auto;border:1px solid #ced7c9;border-radius:12px;padding:24px;background:#fafbf7;color:#283631;box-shadow:0 20px 70px #25382930}
@@ -41,13 +42,18 @@ aside{min-width:0}.palettes,.color-grid{min-width:0}.palette{min-width:0}
 <button class="palette" data-palette="mist" aria-label="米色雾蓝"><span class="swatch" style="--a:#AEBFC9;--b:#DCD3C1"></span><small>雾蓝</small></button>
 <button class="palette" data-palette="ocean" aria-label="深海蓝"><span class="swatch" style="--a:#17485B;--b:#F2F3ED"></span><small>深海</small></button>
 <button class="palette" data-palette="ink" aria-label="黑白墨线"><span class="swatch" style="--a:#FAF9F5;--b:#202828"></span><small>墨线</small></button></div>
-<div class="color-grid"><label class="color"><input id="sea" type="color">海洋</label><label class="color"><input id="land" type="color">陆地</label><label class="color"><input id="line" type="color">边界</label><label class="color"><input id="grid" type="color">经纬网</label></div></section>
+<button id="atlasStyle" class="secondary">经典地图配色</button><label class="row" for="countryFill">地图着色<select id="countryFill"><option value="single">单色</option><option value="pastel">柔和分色</option><option value="vintage">复古分色</option></select></label><div class="color-grid"><label class="color"><input id="sea" type="color">海洋</label><label class="color"><input id="land" type="color">陆地</label><label class="color"><input id="line" type="color">边界</label><label class="color"><input id="grid" type="color">经纬网</label></div></section>
 <section class="group"><h2>02 / 构图</h2>
 <label class="row" for="ratio">截图画幅<select id="ratio"><option value="original">经典宽幅</option><option value="wide">16 : 9</option><option value="ultrawide">21 : 9</option><option value="print">3 : 2</option><option value="square">1 : 1</option><option value="tile">可平铺单元</option><option value="custom">自定义画幅</option></select></label>
 <label class="row" for="density">横向地图数量<select id="density"><option value="1">1 组</option><option value="2" selected>2 组</option><option value="3">3 组</option><option value="4">4 组</option></select></label>
 <label class="row" for="zoom">地图缩放<output id="zoomValue"></output></label><input id="zoom" type="range" min="0.2" max="8" step=".01" value="1">
 <p class="note">左键拖动平移；滚轮缩放；按住中键上下拖动调整 scale。画面始终无限拼贴。</p></section>
-<section class="group"><h2>03 / 线条</h2>
+<section class="group"><h2>03 / 图层与线条</h2>
+<label class="row" for="showOcean">海洋深度分层<input id="showOcean" type="checkbox"></label>
+<label class="row" for="showOceanLabels">海洋名称<input id="showOceanLabels" type="checkbox"></label>
+<label class="row" for="showProvinces">中国省界<input id="showProvinces" type="checkbox"></label>
+<label class="row" for="showScale">局部比例尺<input id="showScale" type="checkbox"></label>
+<p class="note">比例尺参考 120°W、20°S，不能用于全图测距。透明背景关闭海洋分层。</p>
 <label class="row" for="lineWidth">边界线宽<output id="lineValue"></output></label><input id="lineWidth" type="range" min=".2" max="1.8" step=".05" value=".6">
 <label class="row" for="showGrid">显示经纬网<input id="showGrid" type="checkbox" checked></label>
 <label class="row" for="spacing">经纬间隔<select id="spacing"><option>10</option><option selected>15</option><option>30</option></select></label>

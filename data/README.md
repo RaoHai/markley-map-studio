@@ -31,3 +31,14 @@ This is a sourced geographic correction, **not a map approved by China's natural
 - Public use in China requires determining and completing applicable map-review procedures. This correction alone does not establish legal compliance.
 
 Natural Earth data is public domain. Official geographic coordinate facts are attributed above. The artifact uses no restricted survey data.
+
+
+## Optional atlas layers
+
+- `china-provinces.geojson`: Natural Earth admin-1 boundary lines 5.1.0, ADM0_A3=CHN only. Clipped to the interior of this repository's China geometry (0.005° inset), merged once, simplified at 0.008°. Only internal lines are added; this does not replace the China POV national border. The source is generalized and may omit segments; it is not an official administrative boundary dataset.
+- `bathymetry.geojson`: Natural Earth 200m and 1000m nested ocean-depth polygons 4.0.0, derived from SRTM Plus. Simplified at 0.035°, with clockwise exterior rings for d3. Display layers, not navigational depth data. Transparent export omits both bathymetric fills.
+- Country colors use the existing shared China POV country topology. A deterministic adjacency coloring assigns distinct fills to neighboring countries; borders are still drawn only once.
+- Local scale: projected differential at 120°W, 20°S, using great-circle distance on a 6371.0088 km sphere. A 1000 km bar shows local scale only, not an exact finite geodesic or a global map scale. Every repeated map cell carries the same geographic reference.
+- Rebuild optional layers with `python scripts/prepare-cartography.py` (pyshp and shapely required). Source ZIP hashes are pinned in the script.
+
+Sources: [Admin-1 boundary lines](https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-1-states-provinces/), [bathymetry](https://www.naturalearthdata.com/downloads/10m-physical-vectors/10m-bathymetry/). Both datasets are public domain.
