@@ -46,7 +46,7 @@ await page.locator('#resolution').selectOption('6000');await page.locator('#expo
 await page.locator('#ratio').selectOption('wide');await page.locator('#density').selectOption('3');await page.locator('[data-palette="ocean"]').click();
 await page.locator('#transparent').check();assert.ok(!(await page.evaluate(()=>mapStudio.createSvg(2000))).includes('width="100%"'));
 await page.locator('#transparent').uncheck();await page.locator('#ratio').selectOption('original');await page.locator('#density').selectOption('2');await page.locator('#spacing').selectOption('15');await page.locator('#resolution').selectOption('4000');await page.locator('[data-palette="mist"]').click();
-await page.waitForFunction(()=>document.querySelector('#mapPreview svg')?.dataset.renderer==='vector');await page.screenshot({path:'.work/preview.png',fullPage:true});
+await page.waitForFunction(()=>document.querySelector('#mapPreview #map')?.dataset.appearance.includes('#dcd3c1'));await page.screenshot({path:'.work/preview.png',fullPage:true});
 await page.setViewportSize({width:390,height:844});await page.screenshot({path:'.work/mobile-check.png',fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
 assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
 console.log(JSON.stringify({png:meta.width+'x'+meta.height,svg:svg.suggestedFilename(),offline:true,mobile:true,runtimeErrors:errors,checks:'custom 1920x1080 PNG, wheel zoom, middle-drag scale, infinite pan, palette, pan/reset, graticule, PNG, SVG, repeat tile, size guard, alpha'},null,2));
