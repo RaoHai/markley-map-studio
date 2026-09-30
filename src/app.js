@@ -40,6 +40,9 @@ function syncResolution(id){
  $('outputHeight').readOnly=$('ratio').value==='tile';
 }
 let pending=false,currentSvg='';
+const svgNS='http://www.w3.org/2000/svg';
+let previewSvg,previewMap,previewBackground,previewCopies,appearanceKey='',cellSource='';
+let textureKey='',textureTimer,textureGeneration=0;
 function dimensions(){
  const mode=$('ratio').value;
  if(mode==='tile')return [1000,4*H];
@@ -47,34 +50,98 @@ function dimensions(){
  return [1600,1600*height/width];
 }
 function grid(){const step=+$('spacing').value;if(!grids.has(step))grids.set(step,path(d3.geoGraticule().step([step,step]).precision(.5)()));return grids.get(step);}
-function createSvg(pixelWidth){
+function layout(){
  const [vw,vh]=dimensions(),tile=$('ratio').value==='tile';
  const k=tile?1:vw/(W*+$('density').value)*+$('zoom').value;
  const tw=W*k,th=H*k,ox=tile?0:state.offsetX,oy=tile?0:state.offsetY;
- let uses='';
+ const transforms=[];
  const j0=Math.floor((-oy-th/2)/(2*th))-1,j1=Math.ceil((vh-oy+th)/(2*th))+1;
  const i0=Math.floor((-ox-tw)/(tw))-2,i1=Math.ceil((vw-ox+tw)/tw)+2;
  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){
   const x=tw/2+(i+(j%2)/2)*tw+ox,y=th/2+2*j*th+oy;
   for(const [r,dx,dy] of [[180,-tw/4,-th],[0,0,0]]){
    const cx=x+dx,cy=y+dy;if(cx+tw/2<0||cx-tw/2>vw||cy+th/2<0||cy-th/2>vh)continue;
-   uses+=`<use href="#map" transform="translate(${cx} ${cy}) rotate(${r}) scale(${k})"/>`;
+   transforms.push(`translate(${cx} ${cy}) rotate(${r}) scale(${k})`);
   }
  }
- const ph=Math.round(pixelWidth*vh/vw),line=+$('lineWidth').value,gwidth=+$('gridWidth').value;
- const [sea,landColor,lineColor,gridColor]=['sea','land','line','grid'].map(id=>$(id).value);
- const transparent=$('transparent').checked;
- return `<svg xmlns="http://www.w3.org/2000/svg" width="${pixelWidth}" height="${ph}" viewBox="0 0 ${vw} ${vh}"><title>Markley Tessellated World Map</title><metadata>Natural Earth 5.1.1 China POV, shared reduced 1:10m topology; China maritime supplement 5.1.0; official Diaoyu island coordinate markers; geographic correction only, no Chinese map-review approval; Lee conformal tetrahedral projection with Markley rectangular arrangement. Geographic coordinates, deduplicated national boundary mesh.</metadata><defs><clipPath id="cell"><rect x="${-W/2}" y="${-H/2}" width="${W}" height="${H}"/></clipPath><g id="map" clip-path="url(#cell)" stroke-linejoin="round" stroke-linecap="round"><path d="${land}" fill="${landColor}" stroke="${landColor}" stroke-width=".3"/>${$('showGrid').checked?`<path d="${grid()}" fill="none" stroke="${gridColor}" stroke-width="${gwidth}" opacity="${$('gridOpacity').value}"/>`:''}<path d="${edges}" fill="none" stroke="${lineColor}" stroke-width="${line}"/><path data-layer="china-maritime" d="${maritimePath}" fill="none" stroke="${lineColor}" stroke-width="${line}"/><path data-layer="china-islands" d="${islandPath}" fill="${landColor}" stroke="${lineColor}" stroke-width="${Math.max(.25,line*.65)}"/><path data-layer="china-shoals" d="${shoalPath}" fill="none" stroke="${lineColor}" stroke-width="${Math.max(.25,line*.65)}"/></g></defs>${transparent?'':`<rect width="100%" height="100%" fill="${sea}"/>`}${uses}</svg>`;
+ return {vw,vh,k,transforms};
 }
+function appearance(){
+ const line=+$('lineWidth').value,gwidth=+$('gridWidth').value;
+ const [sea,landColor,lineColor,gridColor]=['sea','land','line','grid'].map(id=>$(id).value);
+ const showGrid=$('showGrid').checked,opacity=$('gridOpacity').value,step=$('spacing').value;
+ const key=JSON.stringify([landColor,lineColor,gridColor,line,gwidth,showGrid,opacity,step]);
+ if(key!==appearanceKey){
+  cellSource=`<path d="${land}" fill="${landColor}" stroke="${landColor}" stroke-width=".3"/>${showGrid?`<path d="${grid()}" fill="none" stroke="${gridColor}" stroke-width="${gwidth}" opacity="${opacity}"/>`:''}<path d="${edges}" fill="none" stroke="${lineColor}" stroke-width="${line}"/><path data-layer="china-maritime" d="${maritimePath}" fill="none" stroke="${lineColor}" stroke-width="${line}"/><path data-layer="china-islands" d="${islandPath}" fill="${landColor}" stroke="${lineColor}" stroke-width="${Math.max(.25,line*.65)}"/><path data-layer="china-shoals" d="${shoalPath}" fill="none" stroke="${lineColor}" stroke-width="${Math.max(.25,line*.65)}"/>`;
+  appearanceKey=key;
+ }
+ return {key,sea,transparent:$('transparent').checked,source:cellSource};
+}
+const metadata='Natural Earth 5.1.1 China POV, shared reduced 1:10m topology; China maritime supplement 5.1.0; official Diaoyu island coordinate markers; geographic correction only, no Chinese map-review approval; Lee conformal tetrahedral projection with Markley rectangular arrangement. Geographic coordinates, deduplicated national boundary mesh.';
+function createSvg(pixelWidth){
+ const {vw,vh,transforms}=layout(),{source,sea,transparent}=appearance();
+ const ph=Math.round(pixelWidth*vh/vw);
+ return `<svg xmlns="${svgNS}" width="${pixelWidth}" height="${ph}" viewBox="0 0 ${vw} ${vh}"><title>Markley Tessellated World Map</title><metadata>${metadata}</metadata><defs><clipPath id="cell"><rect x="${-W/2}" y="${-H/2}" width="${W}" height="${H}"/></clipPath><g id="map" clip-path="url(#cell)" stroke-linejoin="round" stroke-linecap="round">${source}</g></defs>${transparent?'':`<rect width="100%" height="100%" fill="${sea}"/>`}${transforms.map(t=>`<use href="#map" transform="${t}"/>`).join('')}</svg>`;
+}
+function requestTexture(style,pixelWidth){
+ const key=style.key+':'+pixelWidth;
+ if(textureKey===key)return;
+ textureKey=key;clearTimeout(textureTimer);
+ const generation=++textureGeneration;
+ // Decode a self-contained data URI once, never a temporary preview Blob URL.
+ // While preparing a texture, the previous raster or vector cell stays visible.
+ textureTimer=setTimeout(async()=>{
+  try{
+   const image=new Image(),height=Math.ceil(pixelWidth*H/W);
+   image.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(`<svg xmlns="${svgNS}" width="${pixelWidth}" height="${height}" viewBox="${-W/2} ${-H/2} ${W} ${H}"><g stroke-linejoin="round" stroke-linecap="round">${style.source}</g></svg>`);
+   await image.decode();
+   if(generation!==textureGeneration)return;
+   const canvas=document.createElement('canvas');canvas.width=pixelWidth;canvas.height=height;
+   const context=canvas.getContext('2d');if(!context)throw Error('No preview canvas');
+   context.drawImage(image,0,0,pixelWidth,height);
+   const raster=document.createElementNS(svgNS,'image');
+   for(const [name,value] of Object.entries({x:-W/2,y:-H/2,width:W,height:H,preserveAspectRatio:'none',href:canvas.toDataURL('image/png')}))raster.setAttribute(name,value);
+   if(generation!==textureGeneration)return;
+   previewMap.replaceChildren(raster);previewSvg.dataset.renderer='cached';
+   canvas.width=canvas.height=1;
+  }catch(error){
+   // Vector preview remains usable if raster decoding is unavailable.
+   if(generation===textureGeneration){
+    textureKey='';previewMap.innerHTML=style.source;previewSvg.dataset.renderer='vector';
+   }
+  }
+ },120);
+}
+function updatePreview(style,view){
+ const preview=$('mapPreview');
+ if(!previewSvg){
+  preview.innerHTML=`<svg xmlns="${svgNS}"><title>Markley Tessellated World Map</title><metadata>${metadata}</metadata><defs><clipPath id="cell"><rect x="${-W/2}" y="${-H/2}" width="${W}" height="${H}"/></clipPath><g id="map" clip-path="url(#cell)" stroke-linejoin="round" stroke-linecap="round"></g></defs><rect data-background="true" width="100%" height="100%"/><g data-copies="true"></g></svg>`;
+  previewSvg=preview.querySelector('svg');previewMap=previewSvg.querySelector('#map');previewBackground=previewSvg.querySelector('[data-background]');previewCopies=previewSvg.querySelector('[data-copies]');
+ }
+ if(previewMap.dataset.appearance!==style.key){
+  if(!previewMap.firstElementChild)previewMap.innerHTML=style.source;
+  previewMap.dataset.appearance=style.key;previewSvg.dataset.renderer='preparing';
+ }
+ previewSvg.setAttribute('width',1600);previewSvg.setAttribute('height',1600*view.vh/view.vw);previewSvg.setAttribute('viewBox',`0 0 ${view.vw} ${view.vh}`);
+ previewBackground.setAttribute('fill',style.sea);previewBackground.setAttribute('display',style.transparent?'none':'inline');
+ while(previewCopies.children.length>view.transforms.length)previewCopies.lastElementChild.remove();
+ view.transforms.forEach((transform,i)=>{
+  let node=previewCopies.children[i];
+  if(!node){node=document.createElementNS(svgNS,'use');node.setAttribute('href','#map');previewCopies.append(node);}
+  node.setAttribute('transform',transform);
+ });
+ const displayedWidth=preview.getBoundingClientRect().width*view.k*W/view.vw*(window.devicePixelRatio||1);
+ const quality=displayedWidth>2048?4096:displayedWidth>1024?2048:1024;
+ requestTexture(style,quality);
+}
+
 function render(){
  pending=false;
  const preview=$('mapPreview'),paper=preview.parentElement,message=$('previewMessage');
  try{
-  const nextSvg=createSvg(1600),[aspectWidth,aspectHeight]=dimensions();
-  // Render SVG directly: preview updates no longer depend on a temporary
-  // image URL surviving asynchronous decoding during pan/zoom gestures.
-  preview.innerHTML=nextSvg;
-  currentSvg=nextSvg;
+  const style=appearance(),view=layout(),[aspectWidth,aspectHeight]=dimensions();
+  updatePreview(style,view);
+  currentSvg='ready';
   paper.style.maxWidth=`min(1400px, calc((100vh - 290px) * ${aspectWidth/aspectHeight}))`;
   paper.style.aspectRatio=`${aspectWidth} / ${aspectHeight}`;
   paper.dataset.state='ready';
@@ -89,6 +156,7 @@ function render(){
   for(const id of ['density','zoom'])$(id).disabled=$('ratio').value==='tile';
  }catch(error){
   // Keep the last successful map in place, and expose a useful retry state.
+  clearTimeout(textureTimer);textureGeneration++;textureKey='';
   paper.dataset.state='error';
   $('previewText').textContent=currentSvg?'地图更新失败，已保留上一张预览。':'地图预览暂时无法生成。';
   $('retryPreview').hidden=false;

@@ -18,6 +18,7 @@ try{
  await page.goto(url);
  await page.waitForFunction(()=>document.querySelector('.paper').dataset.state==='ready');
  assert.equal(await page.locator('#previewMessage').isVisible(),false);
+ await page.waitForFunction(()=>document.querySelector('#mapPreview svg')?.dataset.renderer==='cached');
  const previous=await page.locator('#mapPreview').innerHTML();
  await page.evaluate(()=>{
   window.savedSea=document.querySelector('#sea');
