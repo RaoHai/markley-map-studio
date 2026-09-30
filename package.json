@@ -1,0 +1,30 @@
+{
+  "name": "markley-map-studio",
+  "version": "1.0.0",
+  "description": "Offline artistic world-map generator with a conformal Markley tetrahedral tiling",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RaoHai/markley-map-studio.git"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node tests/smoke.mjs",
+    "start": "npx http-server dist -c-1"
+  },
+  "dependencies": {
+    "d3-geo": "3.1.1",
+    "d3-geo-polygon": "2.0.1",
+    "topojson-client": "3.1.0",
+    "world-atlas": "2.0.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "esbuild": "0.28.2",
+    "sharp": "0.35.5"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
