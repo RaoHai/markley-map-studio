@@ -264,9 +264,15 @@ let pendingDownload;
 function confirmDownload(format){
  if(pendingDownload)return Promise.resolve(false);
  const dialog=$('downloadDisclaimer');dialog.returnValue='';$('downloadFormat').textContent=format;
+ $('downloadContext').hidden=false;$('confirmDownload').hidden=false;$('closeDisclaimer').textContent='取消';
  dialog.showModal();
  return new Promise(resolve=>{pendingDownload=resolve;});
 }
+$('showDisclaimer').onclick=()=>{
+ if(pendingDownload)return;
+ $('downloadContext').hidden=true;$('confirmDownload').hidden=true;$('closeDisclaimer').textContent='关闭';
+ $('downloadDisclaimer').returnValue='';$('downloadDisclaimer').showModal();
+};
 $('downloadDisclaimer').addEventListener('close',()=>{
  const resolve=pendingDownload;pendingDownload=null;
  resolve?.($('downloadDisclaimer').returnValue==='download');

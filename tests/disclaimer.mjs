@@ -8,6 +8,11 @@ try{
  await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);
  await page.waitForFunction(()=>document.querySelector('.paper').dataset.state==='ready');
  assert.ok((await page.locator('.data-notice').textContent()).includes('未经过官方审图，仅供学习'));
+ await page.locator('#showDisclaimer').click();
+ assert.equal(await page.locator('#downloadDisclaimer').isVisible(),true);
+ assert.equal(await page.locator('#confirmDownload').isVisible(),false);
+ await page.getByRole('button',{name:'关闭',exact:true}).click();
+ assert.equal(downloads,0);
  await page.locator('#exportSvg').click();
  assert.equal(await page.locator('#downloadDisclaimer').isVisible(),true);
  assert.equal(await page.locator('#downloadFormat').textContent(),'SVG');
