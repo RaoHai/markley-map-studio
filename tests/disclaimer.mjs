@@ -1,3 +1,4 @@
+import {loadTestData,fixture} from './fixtures.mjs';
 import {chromium} from '@playwright/test';
 import {pathToFileURL} from 'node:url';
 import assert from 'node:assert/strict';
@@ -6,6 +7,7 @@ try{
  const page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
  let downloads=0;page.on('download',()=>downloads++);
  await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);
+ await loadTestData(page);
  await page.waitForFunction(()=>document.querySelector('.paper').dataset.state==='ready');
  assert.ok((await page.locator('.data-notice').textContent()).includes('未经过官方审图，仅供学习'));
  await page.locator('#showDisclaimer').click();

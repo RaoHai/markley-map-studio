@@ -1,7 +1,8 @@
 import {build} from 'esbuild';
 import fs from 'node:fs';
 import {Script} from 'node:vm';
-const result=await build({entryPoints:['src/app.js'],bundle:true,loader:{'.geojson':'json'},format:'iife',minify:true,write:false,legalComments:'inline'});
+const result=await build({entryPoints:['src/app.js'],bundle:true,loader:{'.geojson':'json'},format:'iife',minify:true,write:false,metafile:true,legalComments:'inline'});
+if(Object.keys(result.metafile.inputs).some(name=>name.startsWith('data/')))throw Error('Real map data must not be included in the application bundle.');
 const js=result.outputFiles[0].text.replaceAll('</script','<\\/script');
 const notice=fs.readFileSync('THIRD_PARTY_NOTICES.txt','utf8');
 const html=fs.readFileSync('src/template.html','utf8').replace('/* APP_BUNDLE */',()=>js)+`\n<!--\n${notice.replaceAll('--','—')}\n-->\n`;

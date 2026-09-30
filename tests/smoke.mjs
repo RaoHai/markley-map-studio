@@ -1,3 +1,4 @@
+import {loadTestData,fixture} from './fixtures.mjs';
 import {chromium} from '@playwright/test';
 import sharp from 'sharp';
 import assert from 'node:assert/strict';
@@ -8,6 +9,7 @@ const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{
 const page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
 const errors=[],external=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(/^https?:/.test(r.url()))external.push(r.url());});
 await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);
+ await loadTestData(page);
 await page.waitForFunction(()=>document.querySelector('.paper').dataset.state==='ready' && !!document.querySelector('#mapPreview canvas'));
 assert.equal(await page.locator('#sea').inputValue(),'#aebfc9');
 await page.locator('[data-palette="terracotta"]').click();assert.equal(await page.locator('#sea').inputValue(),'#d6a071');

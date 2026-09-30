@@ -1,3 +1,7 @@
+# External map data
+
+No real map dataset is stored in this directory or bundled into the application. The descriptions below document the separately downloadable default package. Generated files are Git-ignored. Existing historical commits may still contain previous datasets.
+
 # China-POV geography and correction record
 
 This is a sourced geographic correction, **not a map approved by China's natural resources authorities**. No map-review number is claimed or inherited from another map. Natural Earth China POV is third-party data, not the official Chinese boundary standard.

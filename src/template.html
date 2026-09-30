@@ -25,6 +25,7 @@ aside{min-width:0}.palettes,.color-grid{min-width:0}.palette{min-width:0}
 .paper[data-state=error] #previewMessage{inset:auto 12px 12px;flex-direction:row;border:1px solid #d3dbce;border-radius:6px;padding:12px}
 #retryPreview{border:1px solid #ced7c9;background:#fff;color:#50654f;border-radius:5px;padding:6px 10px;font-size:11px}
 #atlasStyle{width:100%;margin:12px 0 0;border:1px solid #ced7c9;border-radius:6px;padding:10px;font-size:12px}
+fieldset{border:0;padding:0;margin:0;min-width:0}.data-loader button,.import-button{display:block;width:100%;border:0;border-radius:6px;padding:11px;font-size:12px;text-align:center;margin-top:10px}.import-button{cursor:pointer}.import-button input{display:none}
 .disclaimer-link{background:none;border:0;padding:0;color:#536c60;text-decoration:underline;cursor:pointer;font:inherit;margin-top:6px}
 .data-notice{font-size:11px;line-height:1.7;color:#687762;margin:14px 0 0}
 #downloadDisclaimer{width:min(480px,calc(100% - 32px));max-height:calc(100dvh - 48px);overflow:auto;border:1px solid #ced7c9;border-radius:12px;padding:24px;background:#fafbf7;color:#283631;box-shadow:0 20px 70px #25382930}
@@ -37,6 +38,7 @@ aside{min-width:0}.palettes,.color-grid{min-width:0}.palette{min-width:0}
 </style></head><body>
 <header><div><h1>Markley Map Studio</h1><p>马克利四面体投影地图生成器</p></div><span class="badge">WORLD MAP STUDIO</span></header>
 <main><aside>
+<section class="group data-loader"><h2>00 / 地图数据</h2><p class="note">页面和代码仓库不内置真实地图数据。下载后在浏览器中生成，也可导入已下载的数据包。</p><button id="downloadData" class="primary">下载并加载地图数据</button><label class="import-button secondary" for="importData">导入本地数据包<input id="importData" type="file" accept=".json,application/json"></label><p id="dataStatus" class="note" role="status">尚未加载地图数据。</p></section><fieldset id="mapControls" disabled>
 <section class="group"><h2>01 / 色彩</h2><div class="palettes">
 <button class="palette" data-palette="terracotta" aria-label="陶土暖橙"><span class="swatch" style="--a:#D6A071;--b:#F2DDCB"></span><small>暖橙</small></button>
 <button class="palette" data-palette="mist" aria-label="米色雾蓝"><span class="swatch" style="--a:#AEBFC9;--b:#DCD3C1"></span><small>雾蓝</small></button>
@@ -60,8 +62,8 @@ aside{min-width:0}.palettes,.color-grid{min-width:0}.palette{min-width:0}
 <label class="row" for="gridWidth">经纬线宽<output id="gridValue"></output></label><input id="gridWidth" type="range" min=".1" max="1" step=".05" value=".25">
 <label class="row" for="gridOpacity">经纬网浓度<output id="gridOpacityValue"></output></label><input id="gridOpacity" type="range" min=".1" max="1" step=".05" value=".45"></section>
 <section class="export"><h2>04 / 截图与导出</h2><label class="row" for="resolution">分辨率预设<select id="resolution"><option value="2000">2000 px</option><option value="4000" selected>4000 px</option><option value="6000">6000 px</option><option value="8000">8000 px</option></select></label><div class="resolution-fields"><label for="outputWidth">宽度 / px<input id="outputWidth" type="number" min="64" max="12000" step="1" value="4000"></label><span>×</span><label for="outputHeight">高度 / px<input id="outputHeight" type="number" min="64" max="12000" step="1" value="1732"></label></div><label class="row" for="lockAspect">锁定宽高比<input id="lockAspect" type="checkbox" checked></label><label class="row" for="transparent">透明海洋背景<input id="transparent" type="checkbox"></label><button id="exportPng" class="primary">生成 PNG 截图</button><button id="exportSvg" class="secondary">下载矢量 SVG</button><p class="note">截图只包含地图。大幅打印或继续拼接，推荐 SVG。</p><p id="status" role="status" aria-live="polite"></p></section>
-<p class="data-notice">使用 Natural Earth 中国口径版数据，未经过官方审图，仅供学习。<br><button id="showDisclaimer" class="disclaimer-link">免责声明</button></p>
-</aside><section class="workspace"><div class="toolbar"><span id="modeLabel">正在生成地图…</span><button id="resetView">重置位置</button></div><div class="preview-wrap"><div class="paper" data-state="loading"><div id="mapPreview" role="img" aria-label="拼接世界地图预览"></div><div id="previewMessage" role="status" aria-live="polite"><span id="previewText">正在生成地图…</span><button id="retryPreview" hidden>重新生成</button></div></div></div><div class="footer"><span>Natural Earth China POV · Markley</span><span id="sizeLabel"></span></div></section></main>
+</fieldset><p class="data-notice">使用 Natural Earth 中国口径版数据，未经过官方审图，仅供学习。<br><button id="showDisclaimer" class="disclaimer-link">免责声明</button></p>
+</aside><section class="workspace"><div class="toolbar"><span id="modeLabel">请先下载或导入地图数据。</span><button id="resetView">重置位置</button></div><div class="preview-wrap"><div class="paper" data-state="loading"><div id="mapPreview" role="img" aria-label="拼接世界地图预览"></div><div id="previewMessage" role="status" aria-live="polite"><span id="previewText">请先下载或导入地图数据。</span><button id="retryPreview" hidden>重新生成</button></div></div></div><div class="footer"><span>Markley · 用户加载地图数据</span><span id="sizeLabel"></span></div></section></main>
 <dialog id="downloadDisclaimer" aria-labelledby="disclaimerTitle" aria-describedby="disclaimerSource disclaimerLimits disclaimerUse">
 <h2 id="disclaimerTitle">免责声明<span id="downloadContext" hidden> · 下载 <span id="downloadFormat">地图</span></span></h2>
 <p id="disclaimerSource"><strong>本地图使用 Natural Earth 中国口径版数据，未经过官方审图，仅供学习。</strong></p>

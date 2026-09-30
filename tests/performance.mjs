@@ -1,3 +1,4 @@
+import {loadTestData,fixture} from './fixtures.mjs';
 import {chromium} from '@playwright/test';
 import {pathToFileURL} from 'node:url';
 import assert from 'node:assert/strict';
@@ -5,6 +6,7 @@ const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{
 try{
  const page=await browser.newPage({viewport:{width:1440,height:1000},deviceScaleFactor:2});
  await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);
+ await loadTestData(page);
  await page.waitForFunction(()=>document.querySelector('#mapPreview canvas')?.dataset.textureVersion);
  await page.waitForTimeout(350);
  const info=()=>page.evaluate(()=>({scene:Number(document.querySelector('#mapPreview').dataset.sceneVersion),texture:Number(document.querySelector('#mapPreview canvas').dataset.textureVersion),scale:Number(document.querySelector('#mapPreview canvas').dataset.scale),width:document.querySelector('#mapPreview canvas').width}));

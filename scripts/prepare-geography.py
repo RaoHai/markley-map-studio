@@ -67,7 +67,9 @@ for a in json.loads((root/'diaoyu-points.json').read_text()):
   points.append({'type':'Feature','properties':{'name':a['name'],'kind':'island','source':'SOA official coordinates, 2012; MFA republication'},'geometry':{'type':'Point','coordinates':a['coordinates']}})
 for name,g in islands:
  q=g.representative_point();points.append({'type':'Feature','properties':{'name':{'Spratly Is.':'南沙群岛岛礁','Paracel Is.':'西沙群岛岛礁','Scarborough Reef':'黄岩岛'}[name],'kind':'reef' if name=='Scarborough Reef' else 'island','source':'Natural Earth 5.1.1 minor-island polygon representative point'},'geometry':mapping(q)})
-points.append({'type':'Feature','properties':{'name':'曾母暗沙','kind':'shoal','source':'People’s Daily/CPC report 2013-05-15, 3°58′N 112°17′E'},'geometry':{'type':'Point','coordinates':[112+17/60,3+58/60]}})
+# Optional point facts must be supplied externally, not embedded in this repository.
+shoals=root/'shoal-points.json'
+if shoals.exists():points.extend(json.loads(shoals.read_text()))
 (out/'china-island-markers.geojson').write_text(json.dumps({'type':'FeatureCollection','features':points},ensure_ascii=False,separators=(',',':')))
 print('Countries',len(features),'island markers',len(points),'maritime segments',len(lines))
 print('POV ZIP SHA256',hashlib.sha256((root/'countries-chn.zip').read_bytes()).hexdigest())

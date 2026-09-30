@@ -1,15 +1,23 @@
 import {p,W,H,d3} from './projection.js';
 import {mesh,feature} from 'topojson-client';
-import world from '../data/world-cn.topo.json';
-import maritime from '../data/china-maritime.geojson';
-import islandMarkers from '../data/china-island-markers.geojson';
-import {countryFill,provincePath,oceanFill,oceanLabels,scaleBar} from './cartography.js';
+import {setCartography,countryFill,provincePath,oceanFill,oceanLabels,scaleBar} from './cartography.js';
 const $=id=>document.getElementById(id);
-const path=d3.geoPath(p).digits(3), land=path(feature(world,world.objects.land));
-const edges=path(mesh(world,world.objects.countries));
-const maritimePath=path(maritime);
-const islandPath=d3.geoPath(p).pointRadius(.7)( {type:'FeatureCollection',features:islandMarkers.features.filter(f=>f.properties.kind!=='shoal')} );
-const shoalPath=d3.geoPath(p).pointRadius(.9)( {type:'FeatureCollection',features:islandMarkers.features.filter(f=>f.properties.kind==='shoal')} );
+const path=d3.geoPath(p).digits(3);
+let dataLoaded=false,land='',edges='',maritimePath='',islandPath='',shoalPath='';
+function loadMapData(data){
+ if(!data||data.format!=='markley-map-data-v1'||data.world?.type!=='Topology'||!data.world.objects?.countries||!data.world.objects?.land||!Array.isArray(data.maritime?.features)||!Array.isArray(data.islands?.features)||!data.provinces?.geometry||!Array.isArray(data.bathymetry?.features))throw Error('请选择 Markley 地图数据包 JSON。');
+ const world=data.world;
+ const nextLand=path(feature(world,world.objects.land)),nextEdges=path(mesh(world,world.objects.countries)),nextMaritime=path(data.maritime);
+ const nextIslands=d3.geoPath(p).pointRadius(.7)({type:'FeatureCollection',features:data.islands.features.filter(f=>f.properties.kind!=='shoal')});
+ const nextShoals=d3.geoPath(p).pointRadius(.9)({type:'FeatureCollection',features:data.islands.features.filter(f=>f.properties.kind==='shoal')});
+ if([nextLand,nextEdges,nextMaritime,nextIslands,nextShoals].some(s=>s&&/NaN|Infinity/.test(s)))throw Error('数据包含无法投影的坐标。');
+ setCartography(world,data.provinces,data.bathymetry,data.oceanLabels);
+ [land,edges,maritimePath,islandPath,shoalPath]=[nextLand,nextEdges,nextMaritime,nextIslands,nextShoals];
+ dataLoaded=true;appearanceKey='';textureKey='';$('mapControls').disabled=false;
+ $('dataStatus').textContent='数据已加载，仅在当前浏览器会话中使用。';
+ $('previewText').textContent='正在生成地图…';$('previewMessage').hidden=false;
+ finishRender();
+}
 const grids=new Map();
 const palettes={
  terracotta:['#D6A071','#F2DDCB','#995F4E','#A56E55'],
@@ -84,8 +92,9 @@ function appearance(){
  }
  return {key,sea,transparent:$('transparent').checked,source:cellSource};
 }
-const metadata='Natural Earth 5.1.1 China POV, shared reduced 1:10m topology; China maritime supplement 5.1.0; official Diaoyu island coordinate markers; geographic correction only, no Chinese map-review approval; Lee conformal tetrahedral projection with Markley rectangular arrangement. Geographic coordinates, deduplicated national boundary mesh. 使用 Natural Earth 中国口径版。未经过官方审图，仅供学习。';
+const metadata='User-loaded external geographic data; no map-review approval is claimed by this tool. Lee conformal tetrahedral projection with Markley rectangular arrangement. Shared national-boundary topology. 未经过官方审图，仅供学习。';
 function createSvg(pixelWidth){
+ if(!dataLoaded)throw Error('请先下载或导入地图数据。');
  const {vw,vh,transforms}=layout(),{source,sea,transparent}=appearance();
  const ph=Math.round(pixelWidth*vh/vw);
  return `<svg xmlns="${svgNS}" width="${pixelWidth}" height="${ph}" viewBox="0 0 ${vw} ${vh}"><title>Markley Tessellated World Map</title><metadata>${metadata}</metadata><defs><clipPath id="cell"><rect x="${-W/2}" y="${-H/2}" width="${W}" height="${H}"/></clipPath><g id="map" clip-path="url(#cell)" stroke-linejoin="round" stroke-linecap="round">${source}</g></defs>${transparent?'':`<rect width="100%" height="100%" fill="${sea}"/>`}${transforms.map(t=>`<use href="#map" transform="${t}"/>`).join('')}</svg>`;
@@ -153,6 +162,7 @@ function updatePreview(style,view){
 }
 
 function render(){
+ if(!dataLoaded)return;
  const preview=$('mapPreview'),paper=preview.parentElement,message=$('previewMessage');
  try{
   const style=appearance(),view=layout(),[aspectWidth,aspectHeight]=dimensions();
@@ -223,7 +233,7 @@ $('atlasStyle').onclick=()=>{
  $('countryFill').value='pastel';for(const id of ['showOcean','showOceanLabels','showProvinces','showScale','showGrid'])$(id).checked=true;
  document.querySelectorAll('.palette').forEach(b=>b.classList.remove('active'));finishRender();
 };
-document.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{
+document.querySelectorAll('#mapControls input,#mapControls select').forEach(el=>el.addEventListener('input',()=>{
  $('status').textContent='';
  syncResolution(el.id);
  if(el.id==='zoom'){requestScale(!sliderScaling);return;}
@@ -236,7 +246,7 @@ $('atlasStyle').onclick=()=>{
  $('countryFill').value='pastel';for(const id of ['showOcean','showOceanLabels','showProvinces','showScale','showGrid'])$(id).checked=true;
  document.querySelectorAll('.palette').forEach(b=>b.classList.remove('active'));finishRender();
 };
-document.querySelectorAll('input,select').forEach(el=>el.addEventListener('change',finishRender));
+document.querySelectorAll('#mapControls input,#mapControls select').forEach(el=>el.addEventListener('change',finishRender));
 document.querySelectorAll('.palette').forEach(b=>b.addEventListener('click',()=>applyPalette(b.dataset.palette)));
 $('resetView').onclick=()=>{state.offsetX=state.offsetY=0;$('zoom').value=1;schedule();};
 let drag;
@@ -327,4 +337,22 @@ new ResizeObserver(entries=>{
  clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(!drag&&!sliderScaling)finishRender();},180);
 }).observe($('mapPreview'));
 applyPalette('mist');
+$('downloadData').onclick=async()=>{
+ const button=$('downloadData');
+ if(!await confirmDownload('地图数据'))return;
+ button.disabled=true;$('dataStatus').textContent='正在下载外部数据…';
+ try{
+  const url=location.protocol==='file:'?'https://markley-map-studio.pages.dev/map-data.json':new URL('map-data.json',location.href).href;
+  const response=await fetch(url,{credentials:'omit',cache:'no-store'});if(!response.ok)throw Error('数据下载失败，请重试或导入本地数据包。');
+  const text=await response.text();loadMapData(JSON.parse(text));
+  download(new Blob([text],{type:'application/json'}),'markley-map-data.json');
+ }catch(error){$('dataStatus').textContent=error.message;}
+ finally{button.disabled=false;}
+};
+$('importData').onchange=async()=>{
+ const file=$('importData').files[0];if(!file)return;
+ try{if(file.size>50*1024*1024)throw Error('数据包不能超过 50 MB。');loadMapData(JSON.parse(await file.text()));}
+ catch(error){$('dataStatus').textContent=error.message;}
+ finally{$('importData').value='';}
+};
 window.mapStudio={render,createSvg,dimensions};

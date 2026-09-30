@@ -1,3 +1,4 @@
+import {loadTestData,fixture} from './fixtures.mjs';
 import {build} from 'esbuild';
 import {chromium} from '@playwright/test';
 import {pathToFileURL} from 'node:url';
@@ -5,16 +6,18 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import sharp from 'sharp';
 await build({entryPoints:['src/cartography.js'],bundle:true,platform:'node',format:'esm',loader:{'.geojson':'json'},outfile:'.work/cartography-test.mjs'});
-const {countryColors,adjacency,scaleLength,provincePath}=await import('../.work/cartography-test.mjs');
+const module=await import('../.work/cartography-test.mjs');module.setCartography(fixture.world,fixture.provinces,fixture.bathymetry);
+const {countryColors,adjacency,scaleLength,provincePath}=module;
 assert.ok(Math.max(...countryColors)<6);
 adjacency.forEach((ns,i)=>ns.forEach(j=>assert.notEqual(countryColors[i],countryColors[j])));
 assert.ok(scaleLength>10&&scaleLength<100);
-assert.ok(provincePath.length>10000&&!/NaN|Infinity/.test(provincePath));
+assert.ok(provincePath.length>10&&!/NaN|Infinity/.test(provincePath));
 const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{})});
 try{
  const page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);
+ await loadTestData(page);
  await page.waitForFunction(()=>document.querySelector('.paper').dataset.state==='ready');
  await page.locator('#atlasStyle').click();
  await page.waitForFunction(()=>document.querySelector('#mapPreview canvas').dataset.appearance.includes('pastel'));

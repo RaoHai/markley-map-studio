@@ -5,3 +5,11 @@ node_modules/
 .env*
 __pycache__/
 *.pyc
+
+# Real map datasets are user-supplied and must never enter Git or the bundle.
+data/*.json
+data/*.geojson
+data/*.gz
+data/*.zip
+docs/*.png
+map-data.json

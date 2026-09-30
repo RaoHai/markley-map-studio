@@ -1,3 +1,4 @@
+import {loadTestData,fixture} from './fixtures.mjs';
 import {chromium} from '@playwright/test';
 import {pathToFileURL} from 'node:url';
 import assert from 'node:assert/strict';
@@ -8,7 +9,7 @@ try{
  const initial=await browser.newPage({javaScriptEnabled:false,viewport:{width:1440,height:1000}});
  await initial.goto(url);
  assert.ok((await initial.locator('.paper').boundingBox()).height>100);
- assert.equal(await initial.locator('#previewText').textContent(),'正在生成地图…');
+ assert.equal(await initial.locator('#previewText').textContent(),'请先下载或导入地图数据。');
  assert.equal(await initial.locator('#mapPreview img').count(),0);
  await initial.close();
  const page=await browser.newPage({viewport:{width:1440,height:1000}});
@@ -16,6 +17,7 @@ try{
  // Even if image/blob URLs are unavailable, the live preview must work.
  await page.addInitScript(()=>{URL.createObjectURL=()=>{throw Error('Blob URLs unavailable in preview test');};});
  await page.goto(url);
+ await loadTestData(page);
  await page.waitForFunction(()=>document.querySelector('.paper').dataset.state==='ready');
  assert.equal(await page.locator('#previewMessage').isVisible(),false);
  await page.waitForFunction(()=>document.querySelector('#mapPreview canvas')?.dataset.textureVersion);
