@@ -18,7 +18,7 @@ try{
  await page.goto(url);
  await page.waitForFunction(()=>document.querySelector('.paper').dataset.state==='ready');
  assert.equal(await page.locator('#previewMessage').isVisible(),false);
- await page.waitForFunction(()=>document.querySelector('#mapPreview svg')?.dataset.renderer==='vector');
+ await page.waitForFunction(()=>document.querySelector('#mapPreview canvas')?.dataset.textureVersion);
  const previous=await page.locator('#mapPreview').innerHTML();
  await page.evaluate(()=>{
   window.savedSea=document.querySelector('#sea');
@@ -39,7 +39,8 @@ try{
   }
  });
  assert.equal(await page.locator('.paper').getAttribute('data-state'),'ready');
- assert.equal(await page.locator('#mapPreview svg').count(),1);
+ await page.waitForFunction(()=>Number(document.querySelector('#mapPreview canvas').dataset.scale)===1600/(1000*Number(document.querySelector('#density').value))*Number(document.querySelector('#zoom').value));
+ assert.equal(await page.locator('#mapPreview canvas').count(),1);
  for(const width of [1440,1024,768,620,390,320]){
   await page.setViewportSize({width,height:1000});
   const frame=await page.locator('#mapPreview').boundingBox();

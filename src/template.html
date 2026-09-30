@@ -24,6 +24,14 @@ aside{min-width:0}.palettes,.color-grid{min-width:0}.palette{min-width:0}
 #previewMessage[hidden],#retryPreview[hidden]{display:none}
 .paper[data-state=error] #previewMessage{inset:auto 12px 12px;flex-direction:row;border:1px solid #d3dbce;border-radius:6px;padding:12px}
 #retryPreview{border:1px solid #ced7c9;background:#fff;color:#50654f;border-radius:5px;padding:6px 10px;font-size:11px}
+.data-notice{font-size:11px;line-height:1.7;color:#687762;margin:14px 0 0}
+#downloadDisclaimer{width:min(480px,calc(100% - 32px));max-height:calc(100dvh - 48px);overflow:auto;border:1px solid #ced7c9;border-radius:12px;padding:24px;background:#fafbf7;color:#283631;box-shadow:0 20px 70px #25382930}
+#downloadDisclaimer::backdrop{background:#18251b66}
+#downloadDisclaimer h2{font-size:17px;letter-spacing:0;color:#283631;margin:0 0 16px}
+#downloadDisclaimer p{font-size:12px;line-height:1.8;color:#667163;margin:12px 0}
+#downloadDisclaimer .dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
+#downloadDisclaimer button{font-size:12px;border:0;border-radius:6px;padding:11px 14px}
+@media(max-width:380px){#downloadDisclaimer{padding:20px}.dialog-actions{flex-direction:column}}
 </style></head><body>
 <header><div><h1>Markley Map Studio</h1><p>马克利四面体投影地图生成器</p></div><span class="badge">WORLD MAP STUDIO</span></header>
 <main><aside>
@@ -45,6 +53,13 @@ aside{min-width:0}.palettes,.color-grid{min-width:0}.palette{min-width:0}
 <label class="row" for="gridWidth">经纬线宽<output id="gridValue"></output></label><input id="gridWidth" type="range" min=".1" max="1" step=".05" value=".25">
 <label class="row" for="gridOpacity">经纬网浓度<output id="gridOpacityValue"></output></label><input id="gridOpacity" type="range" min=".1" max="1" step=".05" value=".45"></section>
 <section class="export"><h2>04 / 截图与导出</h2><label class="row" for="resolution">分辨率预设<select id="resolution"><option value="2000">2000 px</option><option value="4000" selected>4000 px</option><option value="6000">6000 px</option><option value="8000">8000 px</option></select></label><div class="resolution-fields"><label for="outputWidth">宽度 / px<input id="outputWidth" type="number" min="64" max="12000" step="1" value="4000"></label><span>×</span><label for="outputHeight">高度 / px<input id="outputHeight" type="number" min="64" max="12000" step="1" value="1732"></label></div><label class="row" for="lockAspect">锁定宽高比<input id="lockAspect" type="checkbox" checked></label><label class="row" for="transparent">透明海洋背景<input id="transparent" type="checkbox"></label><button id="exportPng" class="primary">生成 PNG 截图</button><button id="exportSvg" class="secondary">下载矢量 SVG</button><p class="note">截图只包含地图。大幅打印或继续拼接，推荐 SVG。</p><p id="status" role="status" aria-live="polite"></p></section>
-<details><summary>地图数据与投影</summary><p>使用 Natural Earth 中国口径边界数据，台湾、香港、澳门归入中国要素；补充南海断续线与重要岛礁位置标记。小岛使用点符号表示位置，暗沙使用空心符号，不表示为陆地。马克利排列基于李氏四面体保角投影，国界共用拓扑，数据均内置。此版本为第三方数据的中国口径修正，南海补充层含九段线，东海有关线段仍待官方样图核对，尚未取得审图号。</p></details>
+<p class="data-notice">使用 Natural Earth 中国口径版数据，未经过官方审图，仅供学习。</p>
 </aside><section class="workspace"><div class="toolbar"><span id="modeLabel">正在生成地图…</span><button id="resetView">重置位置</button></div><div class="preview-wrap"><div class="paper" data-state="loading"><div id="mapPreview" role="img" aria-label="拼接世界地图预览"></div><div id="previewMessage" role="status" aria-live="polite"><span id="previewText">正在生成地图…</span><button id="retryPreview" hidden>重新生成</button></div></div></div><div class="footer"><span>Natural Earth China POV · Markley</span><span id="sizeLabel"></span></div></section></main>
+<dialog id="downloadDisclaimer" aria-labelledby="disclaimerTitle" aria-describedby="disclaimerSource disclaimerLimits disclaimerUse">
+<h2 id="disclaimerTitle">下载 <span id="downloadFormat">地图</span> 前请阅读</h2>
+<p id="disclaimerSource"><strong>本地图使用 Natural Earth 中国口径版数据，未经过官方审图，仅供学习与投影研究。</strong></p>
+<p id="disclaimerLimits">边界、岛礁和海域线段可能存在概化、遗漏或误差，下载内容不作为权威国界或行政区划依据。</p>
+<p id="disclaimerUse">本说明不代表地图已获准公开使用，也不能替代官方审图。公开使用前，请另行核验地图内容及相关要求。</p>
+<form method="dialog" class="dialog-actions"><button value="cancel" class="secondary" autofocus>取消</button><button id="confirmDownload" value="download" class="primary">已了解，继续下载</button></form>
+</dialog>
 <script>/* APP_BUNDLE */</script></body></html>

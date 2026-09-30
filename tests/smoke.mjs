@@ -8,7 +8,7 @@ const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{
 const page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
 const errors=[],external=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(/^https?:/.test(r.url()))external.push(r.url());});
 await page.goto(pathToFileURL(process.cwd()+'/dist/index.html').href);
-await page.waitForFunction(()=>document.querySelector('.paper').dataset.state==='ready' && !!document.querySelector('#mapPreview svg'));
+await page.waitForFunction(()=>document.querySelector('.paper').dataset.state==='ready' && !!document.querySelector('#mapPreview canvas'));
 assert.equal(await page.locator('#sea').inputValue(),'#aebfc9');
 await page.locator('[data-palette="terracotta"]').click();assert.equal(await page.locator('#sea').inputValue(),'#d6a071');
 const before=await page.evaluate(()=>mapStudio.createSvg(2000));
@@ -18,7 +18,7 @@ await page.locator('#resetView').click();assert.equal(await page.evaluate(()=>ma
 await page.locator('#showGrid').uncheck();const without=await page.evaluate(()=>mapStudio.createSvg(2000));assert.ok(without.length<before.length);
 await page.locator('#showGrid').check();await page.locator('#spacing').selectOption('30');
 await page.locator('#resolution').selectOption('2000');
-const pngPromise=page.waitForEvent('download');await page.locator('#exportPng').click();const png=await pngPromise;await png.saveAs('.work/test-export.png');
+const pngPromise=page.waitForEvent('download');await page.locator('#exportPng').click();if(await page.locator('#downloadDisclaimer').isVisible())await page.locator('#confirmDownload').click();const png=await pngPromise;await png.saveAs('.work/test-export.png');
 const meta=await sharp('.work/test-export.png').metadata();assert.equal(meta.width,2000);assert.equal(meta.height,866);
 // Custom frame resolution and both middle-button scale gestures.
 await page.locator('#lockAspect').uncheck();
@@ -26,7 +26,7 @@ await page.locator('#outputWidth').fill('1920');await page.locator('#outputHeigh
 await page.waitForFunction(()=>document.querySelector('#sizeLabel').textContent.includes('1,920'));
 assert.equal(await page.locator('#ratio').inputValue(),'custom');
 assert.deepEqual(await page.evaluate(()=>mapStudio.dimensions()),[1600,900]);
-const customDownload=page.waitForEvent('download');await page.locator('#exportPng').click();await (await customDownload).saveAs('.work/test-custom-resolution.png');
+const customDownload=page.waitForEvent('download');await page.locator('#exportPng').click();if(await page.locator('#downloadDisclaimer').isVisible())await page.locator('#confirmDownload').click();await (await customDownload).saveAs('.work/test-custom-resolution.png');
 const customMeta=await sharp('.work/test-custom-resolution.png').metadata();assert.equal(customMeta.width,1920);assert.equal(customMeta.height,1080);
 const frame=await page.locator('#mapPreview').boundingBox();
 await page.mouse.move(frame.x+frame.width/2,frame.y+frame.height/2);
@@ -41,12 +41,12 @@ const refreshed=await page.locator('#mapPreview').boundingBox();await page.mouse
 const farPan=await page.evaluate(()=>mapStudio.createSvg(1920));assert.ok((farPan.match(/<use /g)||[]).length>4);assert.ok(!farPan.includes('NaN'));
 await page.locator('#resetView').click();await page.locator('#resolution').selectOption('2000');
 await page.locator('#ratio').selectOption('tile');await page.waitForFunction(()=>document.querySelector('#zoom').disabled);assert.equal(await page.locator('#zoom').isDisabled(),true);
-const svgPromise=page.waitForEvent('download');await page.locator('#exportSvg').click();const svg=await svgPromise;await svg.saveAs('.work/test-export.svg');
-await page.locator('#resolution').selectOption('6000');await page.locator('#exportPng').click();await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('4000'));
+const svgPromise=page.waitForEvent('download');await page.locator('#exportSvg').click();await page.locator('#confirmDownload').click();const svg=await svgPromise;await svg.saveAs('.work/test-export.svg');
+await page.locator('#resolution').selectOption('6000');await page.locator('#exportPng').click();if(await page.locator('#downloadDisclaimer').isVisible())await page.locator('#confirmDownload').click();await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('4000'));
 await page.locator('#ratio').selectOption('wide');await page.locator('#density').selectOption('3');await page.locator('[data-palette="ocean"]').click();
 await page.locator('#transparent').check();assert.ok(!(await page.evaluate(()=>mapStudio.createSvg(2000))).includes('width="100%"'));
 await page.locator('#transparent').uncheck();await page.locator('#ratio').selectOption('original');await page.locator('#density').selectOption('2');await page.locator('#spacing').selectOption('15');await page.locator('#resolution').selectOption('4000');await page.locator('[data-palette="mist"]').click();
-await page.waitForFunction(()=>document.querySelector('#mapPreview #map')?.dataset.appearance.includes('#dcd3c1'));await page.screenshot({path:'.work/preview.png',fullPage:true});
+await page.waitForFunction(()=>document.querySelector('#mapPreview canvas')?.dataset.appearance?.includes('#dcd3c1'));await page.screenshot({path:'.work/preview.png',fullPage:true});
 await page.setViewportSize({width:390,height:844});await page.screenshot({path:'.work/mobile-check.png',fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
 assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
 console.log(JSON.stringify({png:meta.width+'x'+meta.height,svg:svg.suggestedFilename(),offline:true,mobile:true,runtimeErrors:errors,checks:'custom 1920x1080 PNG, wheel zoom, middle-drag scale, infinite pan, palette, pan/reset, graticule, PNG, SVG, repeat tile, size guard, alpha'},null,2));

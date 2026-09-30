@@ -43,8 +43,11 @@ let currentSvg='';
 let renderTimer=0,renderFrame=0,settleTimer=0,lastRender=-Infinity;
 const renderInterval=50;
 const svgNS='http://www.w3.org/2000/svg';
-let previewSvg,previewMap,previewBackground,previewCopies,previewPattern,previewScale=1,appearanceKey='',cellSource='';
-let scalePending=false,sliderScaling=false;
+let previewCanvas,previewContext,previewScale=1,previewStyle,texture,textureKey='',textureGeneration=0,paintFrame=0;
+let appearanceKey='',cellSource='',scalePending=false,sliderScaling=false;
+let scalePaintTimer=0,lastScalePaint=-Infinity;
+const scalePaintInterval=33;
+
 function dimensions(){
  const mode=$('ratio').value;
  if(mode==='tile')return [1000,4*H];
@@ -52,21 +55,21 @@ function dimensions(){
  return [1600,1600*height/width];
 }
 function grid(){const step=+$('spacing').value;if(!grids.has(step))grids.set(step,path(d3.geoGraticule().step([step,step]).precision(.5)()));return grids.get(step);}
-function layout(unit=false){
+function layout(unit=false,preview=false){
  const [vw,vh]=unit?[W,4*H]:dimensions(),tile=$('ratio').value==='tile';
- const k=unit||tile?1:vw/(W*+$('density').value)*+$('zoom').value;
+ const k=preview?previewScale:unit||tile?1:vw/(W*+$('density').value)*+$('zoom').value;
  const tw=W*k,th=H*k,ox=unit||tile?0:state.offsetX,oy=unit||tile?0:state.offsetY;
- const transforms=[];
+ const transforms=[],copies=[];
  const j0=Math.floor((-oy-th/2)/(2*th))-1,j1=Math.ceil((vh-oy+th)/(2*th))+1;
  const i0=Math.floor((-ox-tw)/(tw))-2,i1=Math.ceil((vw-ox+tw)/tw)+2;
  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){
   const x=tw/2+(i+(j%2)/2)*tw+ox,y=th/2+2*j*th+oy;
   for(const [r,dx,dy] of [[180,-tw/4,-th],[0,0,0]]){
    const cx=x+dx,cy=y+dy;if(cx+tw/2<0||cx-tw/2>vw||cy+th/2<0||cy-th/2>vh)continue;
-   transforms.push(`translate(${cx} ${cy}) rotate(${r}) scale(${k})`);
+   transforms.push(`translate(${cx} ${cy}) rotate(${r}) scale(${k})`);copies.push({x:cx,y:cy,rotation:r});
   }
  }
- return {vw,vh,k,transforms};
+ return {vw,vh,k,transforms,copies};
 }
 function appearance(){
  const line=+$('lineWidth').value,gwidth=+$('gridWidth').value;
@@ -79,50 +82,83 @@ function appearance(){
  }
  return {key,sea,transparent:$('transparent').checked,source:cellSource};
 }
-const metadata='Natural Earth 5.1.1 China POV, shared reduced 1:10m topology; China maritime supplement 5.1.0; official Diaoyu island coordinate markers; geographic correction only, no Chinese map-review approval; Lee conformal tetrahedral projection with Markley rectangular arrangement. Geographic coordinates, deduplicated national boundary mesh.';
+const metadata='Natural Earth 5.1.1 China POV, shared reduced 1:10m topology; China maritime supplement 5.1.0; official Diaoyu island coordinate markers; geographic correction only, no Chinese map-review approval; Lee conformal tetrahedral projection with Markley rectangular arrangement. Geographic coordinates, deduplicated national boundary mesh. 使用 Natural Earth 中国口径版。未经过官方审图，仅供学习。';
 function createSvg(pixelWidth){
  const {vw,vh,transforms}=layout(),{source,sea,transparent}=appearance();
  const ph=Math.round(pixelWidth*vh/vw);
  return `<svg xmlns="${svgNS}" width="${pixelWidth}" height="${ph}" viewBox="0 0 ${vw} ${vh}"><title>Markley Tessellated World Map</title><metadata>${metadata}</metadata><defs><clipPath id="cell"><rect x="${-W/2}" y="${-H/2}" width="${W}" height="${H}"/></clipPath><g id="map" clip-path="url(#cell)" stroke-linejoin="round" stroke-linecap="round">${source}</g></defs>${transparent?'':`<rect width="100%" height="100%" fill="${sea}"/>`}${transforms.map(t=>`<use href="#map" transform="${t}"/>`).join('')}</svg>`;
 }
+function paintPreview(){
+ if(!texture||!previewContext)return;
+ const {vw,vh,k,copies}=layout(false,true),ctx=previewContext;
+ previewCanvas.dataset.previewScale=String(k);
+ ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,previewCanvas.width,previewCanvas.height);
+ const sx=previewCanvas.width/vw,sy=previewCanvas.height/vh;
+ if(!previewStyle.transparent){ctx.fillStyle=previewStyle.sea;ctx.fillRect(0,0,previewCanvas.width,previewCanvas.height);}
+ for(const cell of copies){
+  ctx.setTransform(sx,0,0,sy,cell.x*sx,cell.y*sy);
+  if(cell.rotation)ctx.rotate(Math.PI);
+  // Only copy pixels from the existing cell. No SVG painting during drag.
+  ctx.drawImage(texture,-W*k/2,-H*k/2,W*k,H*k);
+ }
+}
+function movePreview(){
+ if(paintFrame)return;
+ paintFrame=requestAnimationFrame(()=>{paintFrame=0;paintPreview();});
+}
 function updatePreview(style,view){
  const preview=$('mapPreview');
- if(!previewSvg){
-  preview.innerHTML=`<svg xmlns="${svgNS}"><title>Markley Tessellated World Map</title><metadata>${metadata}</metadata><defs><clipPath id="cell"><rect x="${-W/2}" y="${-H/2}" width="${W}" height="${H}"/></clipPath><g id="map" clip-path="url(#cell)" stroke-linejoin="round" stroke-linecap="round"></g><pattern id="tessellation" patternUnits="userSpaceOnUse" width="${W}" height="${4*H}"><g data-copies="true"></g></pattern></defs><rect data-background="true" width="100%" height="100%"/><rect width="100%" height="100%" fill="url(#tessellation)"/></svg>`;
-  previewSvg=preview.querySelector('svg');previewMap=previewSvg.querySelector('#map');previewBackground=previewSvg.querySelector('[data-background]');previewCopies=previewSvg.querySelector('[data-copies]');previewPattern=previewSvg.querySelector('#tessellation');
-  for(const transform of layout(true).transforms){
-   const node=document.createElementNS(svgNS,'use');node.setAttribute('href','#map');node.setAttribute('transform',transform);previewCopies.append(node);
+ if(!previewCanvas){
+  previewCanvas=document.createElement('canvas');previewCanvas.setAttribute('aria-hidden','true');
+  previewCanvas.style.cssText='display:block;width:100%;height:100%';
+  preview.replaceChildren(previewCanvas);previewContext=previewCanvas.getContext('2d');
+  if(!previewContext)throw Error('浏览器无法创建地图预览画布。');
+ }
+ previewScale=view.k;previewStyle=style;
+ const rect=preview.getBoundingClientRect(),dpr=2;
+ const width=Math.max(1,Math.round(rect.width*dpr)),height=Math.max(1,Math.round(rect.height*dpr));
+ if(previewCanvas.width!==width||previewCanvas.height!==height){previewCanvas.width=width;previewCanvas.height=height;}
+ previewCanvas.dataset.scale=String(view.k);
+ preview.dataset.sceneVersion=String((Number(preview.dataset.sceneVersion)||0)+1);
+ if(texture)paintPreview();
+ const cellWidth=Math.max(256,Math.min(12288,Math.ceil(rect.width/view.vw*view.k*W*dpr)));
+ // Exact settled scale and viewport size are part of the key: every zoom/resize
+ // completion gets a fresh texture, rather than reusing a resolution bucket.
+ const key=JSON.stringify([style.key,view.k,rect.width,rect.height,dpr]);
+ if(textureKey===key)return;
+ textureKey=key;const generation=++textureGeneration;
+ (async()=>{
+  try{
+   const height=Math.ceil(cellWidth*H/W),image=new Image();
+   image.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(`<svg xmlns="${svgNS}" width="${cellWidth}" height="${height}" viewBox="${-W/2} ${-H/2} ${W} ${H}"><g stroke-linejoin="round" stroke-linecap="round">${style.source}</g></svg>`);
+   await image.decode();if(generation!==textureGeneration)return;
+   const next=document.createElement('canvas');next.width=cellWidth;next.height=height;
+   const context=next.getContext('2d');if(!context)throw Error('浏览器无法生成地图预览。');
+   context.drawImage(image,0,0,cellWidth,height);
+   if(generation!==textureGeneration){next.width=next.height=1;return;}
+   const previous=texture;texture=next;paintPreview();
+   if(previous)previous.width=previous.height=1;
+   previewCanvas.dataset.textureVersion=String(generation);previewCanvas.dataset.appearance=style.key;
+   previewCanvas.dataset.pixelDensity=String(dpr);previewCanvas.dataset.textureWidth=String(cellWidth);
+   preview.parentElement.dataset.state='ready';$('previewMessage').hidden=true;currentSvg='ready';
+  }catch(error){
+   if(generation!==textureGeneration)return;
+   textureKey='';preview.parentElement.dataset.state='error';
+   $('previewText').textContent=texture?'地图更新失败，已保留上一张预览。':'地图预览暂时无法生成。';
+   $('retryPreview').hidden=false;$('previewMessage').hidden=false;
   }
- }
- if(previewMap.dataset.appearance!==style.key){
-  previewMap.innerHTML=style.source;previewMap.dataset.appearance=style.key;
-  previewSvg.dataset.renderer='vector';
- }
- previewSvg.setAttribute('width',1600);previewSvg.setAttribute('height',1600*view.vh/view.vw);previewSvg.setAttribute('viewBox',`0 0 ${view.vw} ${view.vh}`);
- previewBackground.setAttribute('fill',style.sea);previewBackground.setAttribute('display',style.transparent?'none':'inline');
- previewScale=view.k;movePreview();
-
-}
-
-function movePreview(){
- if(!previewPattern)return;
- const tile=$('ratio').value==='tile',tw=W*previewScale,periodY=4*H*previewScale;
- const wrap=(value,period)=>((value%period)+period)%period;
- const x=tile?0:wrap(state.offsetX,tw),y=tile?0:wrap(state.offsetY,periodY);
- // Move the existing periodic layer; no geometry or tile layout is rebuilt.
- previewPattern.setAttribute('patternTransform',`translate(${x} ${y}) scale(${previewScale})`);
+ })();
 }
 
 function render(){
  const preview=$('mapPreview'),paper=preview.parentElement,message=$('previewMessage');
  try{
   const style=appearance(),view=layout(),[aspectWidth,aspectHeight]=dimensions();
-  updatePreview(style,view);
-  currentSvg='ready';scalePending=false;
+  scalePending=false;
   paper.style.maxWidth=`min(1400px, calc((100vh - 290px) * ${aspectWidth/aspectHeight}))`;
   paper.style.aspectRatio=`${aspectWidth} / ${aspectHeight}`;
-  paper.dataset.state='ready';
-  message.hidden=true;
+  updatePreview(style,view);
+  if(texture){paper.dataset.state='ready';message.hidden=true;}
   const [outW,outH]=pixels();
   $('sizeLabel').textContent=`${outW.toLocaleString()} × ${outH.toLocaleString()} px`;
   $('modeLabel').textContent=$('ratio').value==='tile'?'矩形重复单元 · 上下左右可平铺':'左键平移 · 滚轮缩放 · 中键拖动调整 scale';
@@ -133,6 +169,7 @@ function render(){
   for(const id of ['density','zoom'])$(id).disabled=$('ratio').value==='tile';
  }catch(error){
   // Keep the last successful map in place, and expose a useful retry state.
+  textureGeneration++;textureKey='';
   paper.dataset.state='error';
   $('previewText').textContent=currentSvg?'地图更新失败，已保留上一张预览。':'地图预览暂时无法生成。';
   $('retryPreview').hidden=false;
@@ -145,6 +182,7 @@ function queueFrame(){
  renderFrame=requestAnimationFrame(()=>{renderFrame=0;render();lastRender=performance.now();});
 }
 function finishRender(){
+ clearTimeout(scalePaintTimer);scalePaintTimer=0;
  clearTimeout(renderTimer);clearTimeout(settleTimer);renderTimer=settleTimer=0;
  if(renderFrame)cancelAnimationFrame(renderFrame);
  queueFrame();
@@ -156,11 +194,21 @@ function schedule(){
  const delay=Math.max(0,renderInterval-(performance.now()-lastRender));
  if(delay)renderTimer=setTimeout(queueFrame,delay);else queueFrame();
 }
+function throttleScalePreview(){
+ if(scalePaintTimer)return;
+ const delay=Math.max(0,scalePaintInterval-(performance.now()-lastScalePaint));
+ scalePaintTimer=setTimeout(()=>{
+  scalePaintTimer=0;lastScalePaint=performance.now();movePreview();
+ },delay);
+}
 function requestScale(debounce=true){
  scalePending=true;
  clearTimeout(renderTimer);clearTimeout(settleTimer);renderTimer=settleTimer=0;
  if(renderFrame){cancelAnimationFrame(renderFrame);renderFrame=0;}
  $('zoomValue').textContent=(+$('zoom').value).toFixed(2)+'×';
+ const [vw]=dimensions();
+ previewScale=$('ratio').value==='tile'?1:vw/(W*+$('density').value)*+$('zoom').value;
+ throttleScalePreview();
  if(debounce)settleTimer=setTimeout(finishRender,160);
 }
 $('zoom').addEventListener('pointerdown',()=>{sliderScaling=true;clearTimeout(settleTimer);});
@@ -212,13 +260,33 @@ for(const event of ['pointerup','pointercancel','lostpointercapture'])$('mapPrev
 });
 function download(blob,name){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
 function filename(ext){const [w,h]=pixels();return `markley-${$('ratio').value}-${w}x${h}.${ext}`;}
-$('exportSvg').onclick=()=>{try{const [width]=pixels(true);download(new Blob([createSvg(width)],{type:'image/svg+xml'}),filename('svg'));}catch(error){$('status').textContent=error.message;}};
+let pendingDownload;
+function confirmDownload(format){
+ if(pendingDownload)return Promise.resolve(false);
+ const dialog=$('downloadDisclaimer');dialog.returnValue='';$('downloadFormat').textContent=format;
+ dialog.showModal();
+ return new Promise(resolve=>{pendingDownload=resolve;});
+}
+$('downloadDisclaimer').addEventListener('close',()=>{
+ const resolve=pendingDownload;pendingDownload=null;
+ resolve?.($('downloadDisclaimer').returnValue==='download');
+});
+$('exportSvg').onclick=async()=>{
+ try{
+  const [width]=pixels(true);if(!await confirmDownload('SVG'))return;
+  download(new Blob([createSvg(width)],{type:'image/svg+xml'}),filename('svg'));
+ }catch(error){$('status').textContent=error.message;}
+};
 $('exportPng').onclick=async()=>{
+ let width,height;
+ try{
+  [width,height]=pixels(true);
+  if(width*height>40000000)throw Error('截图超过 4000 万像素，请降低导出宽度。');
+  if(!await confirmDownload('PNG'))return;
+ }catch(error){$('status').textContent=error.message;return;}
  const button=$('exportPng');button.disabled=true;button.textContent='正在生成截图…';$('status').textContent='';
  let url;
  try{
-  const [width,height]=pixels(true);
-  if(width*height>40000000)throw Error('截图超过 4000 万像素，请降低导出宽度。');
   const source=createSvg(width);url=URL.createObjectURL(new Blob([source],{type:'image/svg+xml'}));
   const image=new Image();image.src=url;await image.decode();
   const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
@@ -230,5 +298,15 @@ $('exportPng').onclick=async()=>{
  }catch(error){$('status').textContent=error.message;}
  finally{if(url)URL.revokeObjectURL(url);button.disabled=false;button.textContent='生成 PNG 截图';}
 };
+let resizeTimer,observedSize='';
+new ResizeObserver(entries=>{
+ const rect=entries[0].contentRect,key=`${rect.width}:${rect.height}`;
+ if(key===observedSize)return;
+ const first=!observedSize;observedSize=key;
+ if(first)return;
+ // Let CSS resize the existing pixels while the window is moving. Allocate
+ // the framebuffer and rerasterize geography only after resizing settles.
+ clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(!drag&&!sliderScaling)finishRender();},180);
+}).observe($('mapPreview'));
 applyPalette('mist');
 window.mapStudio={render,createSvg,dimensions};

@@ -13,9 +13,10 @@ A static, offline world-map poster generator with an infinitely repeating Markle
 - Configurable graticule spacing, thickness, and opacity.
 - Custom output width and height, aspect lock, and resolution presets.
 - Left-drag pan, wheel zoom, and middle-button vertical drag to adjust scale.
-- Full vector preview with a periodic map layer: pan moves the existing layer without rebuilding it; zoom redraws only when the gesture ends. PNG/SVG export uses the same vector geography.
+- Canvas preview reuses a rasterized map cell during pan. Zoom previews are throttled to roughly 30 updates per second using the existing cell. Zoom completion and viewport resize regenerate the cell at the settled scale with fixed 2x pixel density (map-cell width up to 12,288 px); PNG/SVG export uses full vector geography.
 - Infinite tiling and a rectangular repeat-unit export mode.
 - PNG and SVG export, including transparent oceans. PNG exports above 40 million pixels are blocked to avoid excessive memory use.
+- Data-source and learning-only notice, with acknowledgement before every PNG/SVG download.
 - A single self-contained HTML file: works offline without requests to external servers.
 
 ## Run
