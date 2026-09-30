@@ -1,9 +1,14 @@
 import {p,W,H,d3} from './projection.js';
 import {mesh,feature} from 'topojson-client';
-import world from '../node_modules/world-atlas/countries-50m.json';
+import world from '../data/world-cn.topo.json';
+import maritime from '../data/china-maritime.geojson';
+import islandMarkers from '../data/china-island-markers.geojson';
 const $=id=>document.getElementById(id);
 const path=d3.geoPath(p).digits(3), land=path(feature(world,world.objects.land));
 const edges=path(mesh(world,world.objects.countries));
+const maritimePath=path(maritime);
+const islandPath=d3.geoPath(p).pointRadius(.7)( {type:'FeatureCollection',features:islandMarkers.features.filter(f=>f.properties.kind!=='shoal')} );
+const shoalPath=d3.geoPath(p).pointRadius(.9)( {type:'FeatureCollection',features:islandMarkers.features.filter(f=>f.properties.kind==='shoal')} );
 const grids=new Map();
 const palettes={
  terracotta:['#D6A071','#F2DDCB','#995F4E','#A56E55'],
@@ -59,7 +64,7 @@ function createSvg(pixelWidth){
  const ph=Math.round(pixelWidth*vh/vw),line=+$('lineWidth').value,gwidth=+$('gridWidth').value;
  const [sea,landColor,lineColor,gridColor]=['sea','land','line','grid'].map(id=>$(id).value);
  const transparent=$('transparent').checked;
- return `<svg xmlns="http://www.w3.org/2000/svg" width="${pixelWidth}" height="${ph}" viewBox="0 0 ${vw} ${vh}"><title>Markley Tessellated World Map</title><metadata>Natural Earth 4.1.0 / world-atlas 2.0.2, 1:50m; Lee conformal tetrahedral projection with Markley rectangular arrangement. Geographic coordinates, deduplicated national boundary mesh.</metadata><defs><clipPath id="cell"><rect x="${-W/2}" y="${-H/2}" width="${W}" height="${H}"/></clipPath><g id="map" clip-path="url(#cell)" stroke-linejoin="round" stroke-linecap="round"><path d="${land}" fill="${landColor}" stroke="${landColor}" stroke-width=".3"/>${$('showGrid').checked?`<path d="${grid()}" fill="none" stroke="${gridColor}" stroke-width="${gwidth}" opacity="${$('gridOpacity').value}"/>`:''}<path d="${edges}" fill="none" stroke="${lineColor}" stroke-width="${line}"/></g></defs>${transparent?'':`<rect width="100%" height="100%" fill="${sea}"/>`}${uses}</svg>`;
+ return `<svg xmlns="http://www.w3.org/2000/svg" width="${pixelWidth}" height="${ph}" viewBox="0 0 ${vw} ${vh}"><title>Markley Tessellated World Map</title><metadata>Natural Earth 5.1.1 China POV, shared reduced 1:10m topology; China maritime supplement 5.1.0; official Diaoyu island coordinate markers; geographic correction only, no Chinese map-review approval; Lee conformal tetrahedral projection with Markley rectangular arrangement. Geographic coordinates, deduplicated national boundary mesh.</metadata><defs><clipPath id="cell"><rect x="${-W/2}" y="${-H/2}" width="${W}" height="${H}"/></clipPath><g id="map" clip-path="url(#cell)" stroke-linejoin="round" stroke-linecap="round"><path d="${land}" fill="${landColor}" stroke="${landColor}" stroke-width=".3"/>${$('showGrid').checked?`<path d="${grid()}" fill="none" stroke="${gridColor}" stroke-width="${gwidth}" opacity="${$('gridOpacity').value}"/>`:''}<path d="${edges}" fill="none" stroke="${lineColor}" stroke-width="${line}"/><path data-layer="china-maritime" d="${maritimePath}" fill="none" stroke="${lineColor}" stroke-width="${line}"/><path data-layer="china-islands" d="${islandPath}" fill="${landColor}" stroke="${lineColor}" stroke-width="${Math.max(.25,line*.65)}"/><path data-layer="china-shoals" d="${shoalPath}" fill="none" stroke="${lineColor}" stroke-width="${Math.max(.25,line*.65)}"/></g></defs>${transparent?'':`<rect width="100%" height="100%" fill="${sea}"/>`}${uses}</svg>`;
 }
 function render(){
  pending=false;

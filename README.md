@@ -51,8 +51,9 @@ Direct Upload and Git-integrated Pages projects have different setup flows. This
 
 ## Geography and projection
 
-Geography: Natural Earth 1:50m (4.1.0), packaged by world-atlas 2.0.2. Coastlines and political boundaries use a shared TopoJSON topology. This is a decorative map, with the boundaries and generalization of that dataset.
+Geography: Natural Earth 5.1.1, 1:10m, China POV, reduced into a shared topology. Taiwan, Hong Kong, and Macao are unified with the CHN feature. Supplementary South China Sea segments and island/reef markers are included. See [the correction record](data/README.md) for data sources, processing, tests, and known limits.
 
+This is a third-party China-POV correction, **not an officially approved Chinese map**. The source supplies nine South China Sea segments; Chinese-standard East China Sea geometry and a full official-standard check are still outstanding. No map-review number is claimed.
 Projection: Lee's conformal tetrahedral map, rearranged into Markley's periodic rectangular layout. The face projection is provided by `d3-geo-polygon`; this project implements net normalization, reflection, periodic wrapping, clipping, and repeated placement.
 
 References:
@@ -60,7 +61,7 @@ References:
 - [Markley's tetrahedral map, Fil](https://observablehq.com/@fil/markley) — mathematical and visual reference.
 - [D3 geo polygon](https://github.com/d3/d3-geo-polygon) — licensed projection implementation.
 - [Natural Earth](https://www.naturalearthdata.com/) — geographic data.
-- [world-atlas](https://github.com/topojson/world-atlas) — TopoJSON distribution.
+- [China correction record](data/README.md) — source versions, official island coordinate references, processing, and limits.
 
 ## License
 

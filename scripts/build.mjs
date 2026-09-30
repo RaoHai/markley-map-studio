@@ -1,9 +1,11 @@
 import {build} from 'esbuild';
 import fs from 'node:fs';
-const result=await build({entryPoints:['src/app.js'],bundle:true,format:'iife',minify:true,write:false,legalComments:'inline'});
+import {Script} from 'node:vm';
+const result=await build({entryPoints:['src/app.js'],bundle:true,loader:{'.geojson':'json'},format:'iife',minify:true,write:false,legalComments:'inline'});
 const js=result.outputFiles[0].text.replaceAll('</script','<\\/script');
 const notice=fs.readFileSync('THIRD_PARTY_NOTICES.txt','utf8');
-const html=fs.readFileSync('src/template.html','utf8').replace('/* APP_BUNDLE */',js)+`\n<!--\n${notice.replaceAll('--','—')}\n-->\n`;
+const html=fs.readFileSync('src/template.html','utf8').replace('/* APP_BUNDLE */',()=>js)+`\n<!--\n${notice.replaceAll('--','—')}\n-->\n`;
+new Script(html.match(/<script>([\s\S]*?)<\/script>/)[1]);
 fs.mkdirSync('dist',{recursive:true});
 fs.writeFileSync('dist/index.html',html);
 fs.copyFileSync('THIRD_PARTY_NOTICES.txt','dist/THIRD_PARTY_NOTICES.txt');
