@@ -1,6 +1,6 @@
 import {p,W,H,d3} from './projection.js';
 import {mesh,feature} from 'topojson-client';
-import {setCartography,countryFill,provincePath,oceanFill,oceanLabels,scaleBar} from './cartography.js';
+import {setCartography,countryFill,antarcticaFill,provincePath,oceanFill,oceanLabels,scaleBar} from './cartography.js';
 const $=id=>document.getElementById(id);
 const path=d3.geoPath(p).digits(3);
 let dataLoaded=false,land='',edges='',maritimePath='',islandPath='',shoalPath='';
@@ -87,7 +87,7 @@ function appearance(){
  const fillStyle=$('countryFill').value,showOcean=$('showOcean').checked&&!$('transparent').checked,showProvinces=$('showProvinces').checked,showScale=$('showScale').checked,showOceanLabels=$('showOceanLabels').checked;
  const key=JSON.stringify([landColor,lineColor,gridColor,line,gwidth,showGrid,opacity,step,fillStyle,showOcean,showProvinces,showScale,showOceanLabels,sea]);
  if(key!==appearanceKey){
-  cellSource=`${showOcean?oceanFill(sea):''}<path d="${land}" fill="${landColor}" stroke="${landColor}" stroke-width=".3"/>${countryFill(fillStyle)}${showGrid?`<path d="${grid()}" fill="none" stroke="${gridColor}" stroke-width="${gwidth}" opacity="${opacity}"/>`:''}${showProvinces?`<path data-layer="china-provinces" d="${provincePath}" fill="none" stroke="${lineColor}" stroke-width="${line*.55}" opacity=".75"/>`:''}<path d="${edges}" fill="none" stroke="${lineColor}" stroke-width="${line}"/><path data-layer="china-maritime" d="${maritimePath}" fill="none" stroke="${lineColor}" stroke-width="${line}"/><path data-layer="china-islands" d="${islandPath}" fill="${landColor}" stroke="${lineColor}" stroke-width="${Math.max(.25,line*.65)}"/><path data-layer="china-shoals" d="${shoalPath}" fill="none" stroke="${lineColor}" stroke-width="${Math.max(.25,line*.65)}"/>${showOceanLabels?oceanLabels(gridColor):''}${showScale?scaleBar(gridColor):''}`;
+  cellSource=`${showOcean?oceanFill(sea):''}<path d="${land}" fill="${landColor}" stroke="${landColor}" stroke-width=".3"/>${countryFill(fillStyle)}${antarcticaFill()}${showGrid?`<path d="${grid()}" fill="none" stroke="${gridColor}" stroke-width="${gwidth}" opacity="${opacity}"/>`:''}${showProvinces?`<path data-layer="china-provinces" d="${provincePath}" fill="none" stroke="${lineColor}" stroke-width="${line*.55}" opacity=".75"/>`:''}<path d="${edges}" fill="none" stroke="${lineColor}" stroke-width="${line}"/><path data-layer="china-maritime" d="${maritimePath}" fill="none" stroke="${lineColor}" stroke-width="${line}"/><path data-layer="china-islands" d="${islandPath}" fill="${landColor}" stroke="${lineColor}" stroke-width="${Math.max(.25,line*.65)}"/><path data-layer="china-shoals" d="${shoalPath}" fill="none" stroke="${lineColor}" stroke-width="${Math.max(.25,line*.65)}"/>${showOceanLabels?oceanLabels(gridColor):''}${showScale?scaleBar(gridColor):''}`;
   appearanceKey=key;
  }
  return {key,sea,transparent:$('transparent').checked,source:cellSource};

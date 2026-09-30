@@ -4,7 +4,7 @@ import {p, d3, W, H} from './projection.js';
 
 const path = d3.geoPath(p).digits(3);
 export let adjacency=[],countryColors=[],provincePath='';
-let countryPaths=[],depths=[],marineLabels=[];
+let countryPaths=[],depths=[],marineLabels=[],antarcticaPath='';
 export function setCartography(world,provinces,bathymetry,labels={features:[]}){
 const geometries = world.objects.countries.geometries;
 adjacency = neighbors(geometries);
@@ -17,6 +17,10 @@ for (let remaining = geometries.length; remaining; remaining--) {
  let color=0;while(used.has(color))color++;countryColors[i]=color;
 }
 countryPaths=countryColors.map((_,i)=>path(feature(world,geometries[i])));
+antarcticaPath=countryPaths.filter((_,i)=>{
+ const g=geometries[i],props=g.properties||{};
+ return String(g.id||'').toUpperCase()==='ATA'||String(props.ADM0_A3||props.adm0_a3||'').toUpperCase()==='ATA'||/^(antarctica|南极洲?)$/i.test(props.name||props.NAME||'');
+}).join('');
 provincePath=path(provinces)||'';
 marineLabels=labels.features.filter(f=>f.geometry?.type==='Point').map(f=>[String(f.properties?.name||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])),f.geometry.coordinates]);
 depths=bathymetry.features.map(f=>({depth:f.properties.depth,path:path(f)}));
@@ -26,6 +30,7 @@ export function countryFill(style){
  const colors=palettes[style];if(!colors)return '';
  return `<g data-layer="country-colors">${colors.map((color,i)=>`<path fill="${color}" d="${countryPaths.filter((_,j)=>countryColors[j]%colors.length===i).join('')}"/>`).join('')}</g>`;
 }
+export function antarcticaFill(){return antarcticaPath?`<path data-layer="antarctica" fill="#ffffff" d="${antarcticaPath}"/>`:'';}
 
 function mix(hex,target,amount){return '#'+[0,1,2].map(i=>Math.round(parseInt(hex.slice(1+i*2,3+i*2),16)*(1-amount)+target*amount).toString(16).padStart(2,'0')).join('');}
 export function oceanFill(sea){

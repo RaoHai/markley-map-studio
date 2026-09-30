@@ -13,6 +13,7 @@ The optional package is served separately at `https://markley-map-studio.pages.d
 ## Features
 
 - A classic atlas preset, soft or vintage country colors, generalized ocean depth shading and ocean names, China internal province lines, and a local scale bar. Neighboring countries receive distinct colors. The scale bar is calibrated only at 120°W, 20°S; it is not valid everywhere on this variable-scale projection.
+- Antarctica is always filled white in all palettes, including single-color mode, preview, and PNG/SVG export.
 - Four artistic palettes and custom sea, land, border, and graticule colors.
 - Shared topological boundaries drawn once, with consistent stroke widths.
 - Configurable graticule spacing, thickness, and opacity.
